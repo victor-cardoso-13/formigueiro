@@ -1,9 +1,9 @@
 /**
  * Guarda o progresso no próprio aparelho (localStorage). Sem conta, sem nuvem.
- * Se um dia as fases forem recriadas, troque o "v2" da chave.
+ * Se um dia as fases forem recriadas, troque o "v3" da chave.
  * (v1 era a versão antiga com trilha e fome; o jogo foi refeito e o progresso antigo não vale mais.)
  */
-const CHAVE = 'formigueiro:v2';
+const CHAVE = 'formigueiro:v3';
 
 export type Velocidade = 1 | 2 | 3;
 export type TelaSalva = 'inicio' | 'mapa' | 'jogo';

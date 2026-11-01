@@ -28,9 +28,6 @@ export interface Medidas {
 
 export const FOLGA = 0.065;
 export const FOLGA_BAIXO = 0.02;
-/** Cor do fundo da bandeja dentro da moldura (onde ficam os quadradinhos). Lisa: apagar um quadradinho pinta esta cor. */
-export const COR_CAMPO = '#6b709c';
-
 /** Relação altura/largura da arena inteira (com folgas), para a tela calcular o tamanho. */
 export const razaoArena = (h: number): number => alturaArena(h) + FOLGA + FOLGA_BAIXO;
 export const razaoLargura = 1 + 2 * FOLGA;
@@ -134,28 +131,30 @@ export function desenharQuadro(canvas: HTMLCanvasElement, m: Medidas, desenho: n
   const ow = m.Wt - 2;
   const oh = m.pad + Hq + m.pad * 0.95 - oy;
   const R = m.pad * 1.15;
-  ctx.fillStyle = 'rgba(30, 30, 60, 0.28)';
-  rr(ctx, ox, oy + m.W * 0.012, ow, oh, R);
-  ctx.fill();
-  ctx.fillStyle = '#8a8fb8';
-  rr(ctx, ox, oy, ow, oh, R);
-  ctx.fill();
-  const borda = m.W * 0.006;
-  ctx.fillStyle = '#a3a7cc';
-  rr(ctx, ox + borda, oy + borda, ow - 2 * borda, oh - 2 * borda - m.W * 0.006, R * 0.95);
-  ctx.fill();
-  // bandeja funda
+  // só o aro arredondado: dentro fica transparente (o fundo da tela aparece onde os quadradinhos saem)
+  const aro = (x: number, y: number, w: number, h: number, r: number, xi: number, yi: number, wi: number, hi: number, ri: number) => {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.roundRect(xi, yi, wi, hi, ri);
+    ctx.fill('evenodd');
+  };
   const t = m.pad * 0.36;
   const bx = ox + t;
   const by = oy + t;
   const bw = ow - 2 * t;
   const bh = oh - 2 * t;
-  ctx.fillStyle = '#585d88';
-  rr(ctx, bx, by, bw, bh, R * 0.7);
-  ctx.fill();
-  ctx.fillStyle = COR_CAMPO;
-  rr(ctx, bx, by + m.W * 0.01, bw, bh - m.W * 0.01, R * 0.7);
-  ctx.fill();
+  const Ri = R * 0.7;
+  ctx.fillStyle = 'rgba(30, 30, 60, 0.28)';
+  aro(ox, oy + m.W * 0.012, ow, oh, R, bx, by + m.W * 0.012, bw, bh, Ri);
+  ctx.fillStyle = '#8a8fb8';
+  aro(ox, oy, ow, oh, R, bx, by, bw, bh, Ri);
+  const borda = m.W * 0.006;
+  ctx.fillStyle = '#a3a7cc';
+  aro(ox + borda, oy + borda, ow - 2 * borda, oh - 2 * borda - m.W * 0.006, R * 0.95, bx, by, bw, bh, Ri);
+  ctx.strokeStyle = '#585d88';
+  ctx.lineWidth = m.W * 0.006;
+  rr(ctx, bx, by, bw, bh, Ri);
+  ctx.stroke();
   for (let y = 0; y < m.altura; y++) for (let x = 0; x < m.largura; x++) if (desenho[y][x] >= 0) pintarCelula(ctx, m, dpr, x, y, desenho[y][x]);
 }
 
@@ -164,8 +163,7 @@ export function apagarCelula(canvas: HTMLCanvasElement, m: Medidas, x: number, y
   const ctx = canvas.getContext('2d')!;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const r = retCelula(m, dpr, x, y);
-  ctx.fillStyle = COR_CAMPO;
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.clearRect(r.x, r.y, r.w, r.h);
 }
 
 // ---------- poeirinha ----------

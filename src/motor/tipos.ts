@@ -23,7 +23,6 @@ export interface Ninho {
   grupo?: number;
 }
 
-export type Lado = 'esq' | 'dir' | 'topo' | 'baixo';
 
 export interface Ponto {
   x: number;
@@ -38,7 +37,7 @@ export interface Formiga {
   /** 'ida' = indo buscar; 'volta' = carregando o quadradinho até o buraco */
   fase: 'ida' | 'volta';
   /** quadradinho que ela vai pegar (coluna x, linha y do desenho) */
-  alvo: { x: number; y: number; lado: Lado };
+  alvo: { x: number; y: number };
   /** caminho completo (ida + volta), em larguras do quadro */
   caminho: Ponto[];
   /** comprimento acumulado em cada ponto do caminho */

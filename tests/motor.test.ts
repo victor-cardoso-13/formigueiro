@@ -1,49 +1,69 @@
 import { describe, expect, it } from 'vitest';
 import { REGRAS } from '../src/motor/regras.ts';
-import { acumular, caminhoIda, caminhoVolta, centroVaga, buraco, posicaoNoCaminho } from '../src/motor/geometria.ts';
+import { acumular, centroVaga, buraco, posicaoNoCaminho } from '../src/motor/geometria.ts';
 import { clonar, expostos, frente, motivoDeNaoPoder, novoEstado, parado, passo, podeTocar, rodarAteParar, tocar, unidade } from '../src/motor/colonia.ts';
 import { fase } from './ajuda.ts';
 
 describe('quadradinhos expostos', () => {
-  it('só os primeiros de cada linha/coluna vistos de fora; os de trás ficam escondidos', () => {
+  it('exposto = encosta num espaço vazio ligado ao lado de fora; os cercados ficam escondidos', () => {
     // 3x3 cheio de cor 0: expostos = todas as bordas (8 células), o do meio fica escondido
     const e = novoEstado(fase(['000', '000', '000'], [[{ cor: 0, n: 9 }]]));
     const xs = new Set(expostos(e, 0).map((c) => `${c.x},${c.y}`));
     expect(xs.size).toBe(8);
     expect(xs.has('1,1')).toBe(false);
   });
-  it('só mostra a cor pedida e depois que o da frente some, o de trás aparece', () => {
-    const e = novoEstado(fase(['01', '..'], [[{ cor: 1, n: 1 }]]));
-    // linha 0 vista da esquerda: primeiro é a cor 0 (esconde a cor 1); vista da direita: a cor 1 aparece
-    const lados = expostos(e, 1).map((c) => c.lado);
-    expect(lados).toContain('dir');
-    expect(lados).not.toContain('esq');
-    e.desenho[0][0] = -1;
-    expect(expostos(e, 1).map((c) => c.lado)).toContain('esq');
+  it('o que aparece quando o de fora sai: vale também o vizinho de lado, não só a linha reta', () => {
+    const e = novoEstado(fase(['01', '00'], [[{ cor: 1, n: 1 }]]));
+    expect(expostos(e, 1).length).toBe(1); // o 1 está na borda do quadro
+    const f = novoEstado(fase(['000', '010', '000'], [[{ cor: 1, n: 1 }]]));
+    expect(expostos(f, 1).length).toBe(0);
+    f.desenho[1][0] = -1; // abriu um buraco ao lado
+    expect(expostos(f, 1).length).toBe(1);
+  });
+  it('túnel: quadradinho cuja linha reta está tapada, mas que encosta numa caverna aberta para fora', () => {
+    // o 1 em (1,1): em cima, embaixo e à esquerda tem 0; à direita há vazios (2,1),(3,1) que descem até a borda de baixo
+    const e = novoEstado(fase(['00000', '01..0', '000.0'], [[{ cor: 1, n: 1 }]]));
+    expect(e.desenho[1]).toEqual([0, 1, -1, -1, 0]);
+    expect(expostos(e, 1).map((c) => `${c.x},${c.y}`)).toEqual(['1,1']);
+  });
+  it('cavidade fechada (sem ligação com o lado de fora) não conta', () => {
+    const e = novoEstado(fase(['00000', '0.2.0', '00000'], [[{ cor: 2, n: 1 }]]));
+    expect(expostos(e, 2).length).toBe(0);
   });
 });
 
 describe('geometria', () => {
-  it('o caminho começa na vaga, termina no buraco e passa pelo quadradinho', () => {
-    const h = 0.75;
-    const ida = caminhoIda(4, h, centroVaga(h, 0), 1, 1, 'esq');
-    const volta = caminhoVolta(4, h, 1, 1, 'esq');
-    expect(ida[0]).toEqual(centroVaga(h, 0));
-    expect(ida[ida.length - 1]).toEqual({ x: 1.5 / 4, y: 1.5 / 4 });
-    expect(volta[volta.length - 1]).toEqual(buraco(h));
-    const caminho = [...ida, ...volta.slice(1)];
-    const ac = acumular(caminho);
-    const p0 = posicaoNoCaminho(caminho, ac, 0);
-    expect(p0.x).toBeCloseTo(centroVaga(h, 0).x);
-    const fim = posicaoNoCaminho(caminho, ac, 999);
-    expect(fim.x).toBeCloseTo(buraco(h).x);
-    expect(fim.y).toBeCloseTo(buraco(h).y);
+  it('o caminho começa na vaga, passa pelo buraco, chega ao quadradinho e volta ao buraco', () => {
+    const e = novoEstado(fase(['0000', '0000', '0000', '0000'], [[{ cor: 0, n: 16 }]]));
+    tocar(e, 1);
+    passo(e);
+    const f = e.formigas[0];
+    expect(f.caminho[0]).toEqual(centroVaga(e.h, 0));
+    expect(f.caminho[1]).toEqual(buraco(e.h));
+    expect(f.caminho[f.caminho.length - 1]).toEqual(buraco(e.h));
+    const ac = acumular(f.caminho);
+    const p0 = posicaoNoCaminho(f.caminho, ac, 0);
+    expect(p0.x).toBeCloseTo(centroVaga(e.h, 0).x);
+    const fim = posicaoNoCaminho(f.caminho, ac, 999);
+    expect(fim.x).toBeCloseTo(buraco(e.h).x);
+    expect(fim.y).toBeCloseTo(buraco(e.h).y);
+    // no ponto de pegar, ela está no centro do quadradinho
+    const pega = posicaoNoCaminho(f.caminho, ac, f.compIda);
+    expect(pega.x).toBeCloseTo((f.alvo.x + 0.5) / 4);
+    expect(pega.y).toBeCloseTo((f.alvo.y + 0.5) / 4);
   });
-  it('o caminho pelo contorno nunca atravessa o quadro (fora das bordas, exceto a entrada final)', () => {
-    const h = 1;
-    const ida = caminhoIda(4, h, centroVaga(h, 4), 0, 3, 'topo');
-    // todos os pontos menos o último ficam fora do quadro (x<0, x>1, y<0 ou y>h)
-    for (const p of ida.slice(0, -1)) expect(p.x < 0 || p.x > 1 || p.y < 0 || p.y > h).toBe(true);
+  it('a formiga anda pelos espaços vazios: dentro do quadro só passa por células vazias', () => {
+    const e = novoEstado(fase(['00000', '01..0', '000.0'], [[{ cor: 1, n: 1 }]]));
+    tocar(e, 1);
+    passo(e);
+    const f = e.formigas[0];
+    expect(f.alvo).toEqual({ x: 1, y: 1 });
+    const ida = f.caminho.slice(0, f.caminho.findIndex((_, i) => i > 0 && f.acumulado[i] >= f.compIda) + 1);
+    for (const p of ida.slice(2, -1)) {
+      const cx = Math.floor(p.x * 5);
+      const cy = Math.floor(p.y * 5);
+      if (cx >= 0 && cx < 5 && cy >= 0 && cy < 3) expect(e.desenho[cy][cx]).toBe(-1);
+    }
   });
 });
 
@@ -99,13 +119,50 @@ describe('formigas', () => {
     tocar(e, 1);
     const restos: number[] = [];
     let saidas = 0;
-    for (let i = 0; i < 60; i++) {
+    let juntas = 0;
+    for (let i = 0; i < 150; i++) {
+      juntas = Math.max(juntas, e.formigas.length);
       saidas += passo(e).filter((x) => x.tipo === 'saiu').length;
       if (e.vagas[0]) restos.push(e.vagas[0].restam);
     }
     expect(saidas).toBeGreaterThan(5);
     expect(restos[0]).toBeGreaterThan(restos[restos.length - 1] ?? 0);
-    expect(e.formigas.length).toBeGreaterThan(1); // várias ao mesmo tempo
+    expect(juntas).toBeGreaterThan(1); // várias ao mesmo tempo
+  });
+  it('ninhos ligados por cano só liberam as vagas juntos, quando todos terminaram', () => {
+    const e = novoEstado(fase(['0000', '1111', '1111', '1111'], [[{ cor: 0, n: 1, g: 1 }, { cor: 1, n: 12, g: 1 }]]));
+    tocar(e, 1);
+    expect(e.vagas.filter(Boolean).length).toBe(2);
+    for (let i = 0; i < 30; i++) passo(e);
+    expect(e.vagas[1]?.restam).toBeGreaterThan(0); // o 2º ainda tem formigas
+    expect(e.vagas[0]?.restam).toBe(0); // o 1º já mandou a única formiga...
+    expect(e.vagas[0]).not.toBeNull(); // ...mas fica na vaga esperando o outro
+    rodarAteParar(e);
+    expect(e.vagas.every((v) => v === null)).toBe(true);
+  });
+  it('come de baixo para cima e, em cada fileira, da esquerda para a direita', () => {
+    const e = novoEstado(fase(['000', '000', '000'], [[{ cor: 0, n: 9 }]]));
+    tocar(e, 1);
+    const ordem: string[] = [];
+    for (let i = 0; i < 40 && ordem.length < 3; i++) {
+      passo(e);
+      for (const f of e.formigas) if (!ordem.includes(`${f.alvo.x},${f.alvo.y}`)) ordem.push(`${f.alvo.x},${f.alvo.y}`);
+    }
+    expect(ordem).toEqual(['0,2', '1,2', '2,2']);
+  });
+  it('no máximo 10 formigas de um ninho indo comer; a próxima sai quando uma pega', () => {
+    const e = novoEstado(fase(Array.from({ length: 6 }, () => '0'.repeat(30)), [[{ cor: 0, n: 180 }]]));
+    tocar(e, 1);
+    let maior = 0;
+    let pegou = 0;
+    for (let i = 0; i < 300; i++) {
+      pegou += passo(e).filter((x) => x.tipo === 'pegou').length;
+      const indo = e.formigas.filter((f) => f.fase === 'ida').length;
+      maior = Math.max(maior, indo);
+    }
+    expect(maior).toBeGreaterThan(5); // sai uma leva
+    expect(maior).toBeLessThanOrEqual(10);
+    expect(pegou).toBeGreaterThan(10); // saíram mais formigas depois da primeira leva
   });
   it('cada quadradinho só é escolhido por uma formiga', () => {
     const e = novoEstado(fase(['00', '00'], [[{ cor: 0, n: 4 }]]));

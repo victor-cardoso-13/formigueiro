@@ -4,7 +4,7 @@
  */
 import { PALETA } from '../fases/paleta.ts';
 import { simboloSvg } from '../fases/simbolos.ts';
-import { clonar, frente, motivoDeNaoPoder, novoEstado, parado, passo, rodarAteParar, tocar, unidade } from '../motor/colonia.ts';
+import { clonar, frente, motivoDeNaoPoder, ninhosNaGrade, novoEstado, parado, passo, rodarAteParar, tocar, unidade } from '../motor/colonia.ts';
 import { buraco, centroVaga } from '../motor/geometria.ts';
 import { REGRAS } from '../motor/regras.ts';
 import type { Estado, Evento, Fase, Ninho } from '../motor/tipos.ts';
@@ -399,7 +399,9 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           passos++;
         }
       } else {
-        acc += dt * REGRAS.PASSOS_POR_SEGUNDO * MULT_VEL[vel];
+        const ve = velEfetiva();
+        if (ve !== velMostrada) atualizarBotoes();
+        acc += dt * REGRAS.PASSOS_POR_SEGUNDO * MULT_VEL[ve];
         while (acc >= 1 && passos < 30 && e.resultado === 'jogando') {
           acc -= 1;
           for (const f of e.formigas) corDe.set(f.id, f.cor);
@@ -421,12 +423,16 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   }
 
   // ---------- botões e avisos ----------
+  /** Velocidade de verdade: quando o último ninho já subiu (não sobra nenhum na grade), vai na máxima até acabar (não muda a escolha salva). */
+  const velEfetiva = (): Vel => (ninhosNaGrade(e).length === 0 ? 3 : vel);
+  let velMostrada: Vel = vel;
   function atualizarBotoes() {
+    velMostrada = velEfetiva();
     const pode = pilha.length > 0;
     bDesfazer.classList.toggle('apagado', !pode);
     bDesfazer.setAttribute('aria-disabled', String(!pode));
-    bVel.innerHTML = `${ICONE_VEL}<span class="vtx"><span class="vn">${vel}×</span><span class="vt">${NOME_VEL[vel]}</span></span>`;
-    bVel.dataset.vel = String(vel);
+    bVel.innerHTML = `${ICONE_VEL}<span class="vtx"><span class="vn">${velMostrada}×</span><span class="vt">${NOME_VEL[velMostrada]}</span></span>`;
+    bVel.dataset.vel = String(velMostrada);
   }
   function aviso(texto: string) {
     jogoEl.querySelector('.aviso')?.remove();
