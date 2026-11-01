@@ -14,9 +14,23 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
+/* iPhone/iPad na Tela de Início (iOS 26, bug WebKit 301108): com status-bar "black-translucent" +
+   viewport-fit=cover, a janela do app fica MENOR que a tela (pela altura da barra de status) e o WebKit
+   nem desenha conteúdo fixo ali: sobra uma faixa lisa embaixo. O iOS só dá a janela inteira se a página
+   for pelo menos tão alta quanto a tela. O min() com 100lvh evita rolagem onde o recuo do topo é 0
+   (WebKit 316008). Só vale no modo app. Não apague. */
+@media (display-mode: standalone) {
+  html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top))); }
+}
+/* Fundo no ::before fixo (nunca no body/html): senão o iOS deixa uma faixa lisa embaixo. */
+/* Fundo azul-arroxeado (estilo Colony Flow) em TODAS as telas. A cor do html = fim do degradê. */
+html { background-color: #585d8a; }
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1;
+  background: linear-gradient(180deg, #6a70a0 0%, #60669a 45%, #585d8a 100%);
+}
 body {
   font-family: 'Nunito', -apple-system, system-ui, sans-serif; font-weight: 600;
-  background: radial-gradient(circle at 50% 0%, #fffaf2, #f6eee2 70%);
   color: var(--tinta);
   user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -25,8 +39,7 @@ body {
 /* iPhone: sem zoom de dois toques em lugar nenhum (a grade bloqueia tudo, ver main.ts) */
 * { touch-action: manipulation; }
 #app {
-  position: relative;
-  height: 100dvh;
+  position: fixed; inset: 0;
   display: flex; flex-direction: column; align-items: center;
   padding: max(14px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   gap: 10px;
@@ -37,3 +50,363 @@ svg.ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: ro
 
 /* Botões e demais telas do jogo: acrescente abaixo. Identidade: creme + tinta + âmbar (a mesma do Miaudoku). */
 h1 { font-family: var(--titulo); font-weight: 700; margin: 0; }
+
+/* ===== Formigueiro ===== */
+[hidden] { display: none !important; }
+:root { --verde: #2f9e55; }
+h2 { font-family: var(--titulo); font-weight: 700; margin: 0; }
+.num { font-family: var(--titulo); }
+
+.btn {
+  height: 52px; min-width: 52px; padding: 0 18px; border-radius: 26px;
+  background: #fff; border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta);
+  font-weight: 800; font-size: 19px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  white-space: nowrap; touch-action: manipulation;
+}
+.btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.btn:disabled, .btn.apagado { opacity: 0.4; box-shadow: none; }
+.btn.grande { height: 64px; font-size: 24px; padding: 0 34px; border-radius: 32px; font-family: var(--titulo); }
+.btn.ambar { background: var(--ambar-claro); }
+.btn.redondo { width: 52px; padding: 0; font-family: var(--titulo); font-size: 26px; }
+
+
+#app > * { width: 100%; flex: 1; min-height: 0; }
+
+/* ----- tela do jogo ----- */
+.jogo {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; overflow: hidden;
+  gap: 10px; justify-items: center; align-items: center; padding-bottom: 5px;
+}
+.jogo .btn { height: var(--bh, 52px); }
+.jogo .btn.redondo { width: var(--bh, 52px); }
+.jogo .topo { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.jogo .topo h2 { font-size: clamp(17px, 4.6vw, 26px); text-align: center; flex: 1; text-wrap: balance; line-height: 1.1; }
+.jogo.grande .topo h2 { font-size: 30px; }
+.palco { position: relative; z-index: 4; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.arena { position: relative; flex: none; }
+.arena canvas { position: absolute; left: 0; top: 0; display: block; pointer-events: none; }
+#cvQuadro { z-index: 1; }
+#cvFormigas { z-index: 4; }
+
+/* ===== Visual "Colony Flow" (tela do jogo) ===== */
+/* Fundo azul-arroxeado só enquanto se joga (classe no <html>, posta/tirada por tela-jogo.ts). A cor do html = fim do degradê. */
+html.modo-jogo { background-color: #585d8a; }
+html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #60669a 45%, #585d8a 100%); }
+.jogo { --tinta-escura: #262340; }
+/* número/título: branco com contorno escuro (bem legível em qualquer cor) */
+.contorno, .jogo .topo h2, .ninho .n, .ninho-vaga .n {
+  color: #fff; -webkit-text-stroke: 0.2em var(--tinta-escura); paint-order: stroke fill;
+}
+.jogo .topo h2 { font-size: clamp(26px, 7vw, 34px); letter-spacing: 0.01em; text-shadow: 0 3px 0 var(--tinta-escura); }
+.jogo.grande .topo h2 { font-size: 40px; }
+
+/* botão roxo (Fases), como o de pausa do Colony */
+.btn.roxo {
+  background: linear-gradient(180deg, #c98cf3 0%, #a660dc 55%, #8f49c6 100%); color: #fff;
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), 0 4px 0 var(--tinta-escura);
+  border-radius: 18px; font-family: var(--titulo); font-weight: 700; padding: 0 14px;
+  -webkit-text-stroke: 0.12em var(--tinta-escura); paint-order: stroke fill;
+}
+.btn.roxo .ic { stroke-width: 3; stroke: #fff; filter: drop-shadow(0 0 1px var(--tinta-escura)) drop-shadow(0 1px 0 var(--tinta-escura)); }
+.btn.roxo:active { transform: translateY(2px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), 0 2px 0 var(--tinta-escura); }
+
+/* botão de velocidade, como o "2x" do Colony: cinza (lento), verde (normal), laranja (turbo) */
+.jogo .btn.vel {
+  --vc1: #d6d8ea; --vc2: #a9adc9; height: var(--bh, 52px);
+  min-width: 96px; padding: 0 10px 0 8px; gap: 6px; flex-direction: row; border-radius: 18px;
+  background: linear-gradient(180deg, var(--vc1) 0%, var(--vc2) 100%); color: var(--tinta-escura);
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), 0 4px 0 var(--tinta-escura);
+  font-family: var(--titulo); line-height: 1;
+}
+.jogo .btn.vel[data-vel="2"] { --vc1: #a6ef6c; --vc2: #55c22e; }
+.jogo .btn.vel[data-vel="3"] { --vc1: #ffd36a; --vc2: #ff9a1f; }
+.jogo .btn.vel:active { transform: translateY(2px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), 0 2px 0 var(--tinta-escura); }
+.ic-vel { fill: #fff; stroke: var(--tinta-escura); stroke-width: 2; stroke-linejoin: round; flex: none; }
+.vel .vtx { display: flex; flex-direction: column; align-items: center; }
+.vel .vn { font-size: 24px; font-weight: 700; }
+.vel .vt { font-size: 13px; font-family: 'Nunito', sans-serif; font-weight: 800; }
+
+/* buraco escuro com a tampa de bueiro ao lado */
+.buraco {
+  position: absolute; z-index: 1; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 60%, #121222 40%, #22223a 75%, #34355a 100%);
+  box-shadow: inset 0 5px 6px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.12);
+}
+.tampa {
+  position: absolute; z-index: 2; border-radius: 50%;
+  background: linear-gradient(180deg, #d4d7ee 0%, #b3b7d6 50%, #9a9fc4 100%);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.7), inset 0 -3px 0 rgba(60, 64, 110, 0.25), 0 6px 0 #5d6196, 0 10px 8px rgba(15, 15, 45, 0.35);
+}
+/* miolo afundado da tampa */
+.tampa::before {
+  content: ''; position: absolute; inset: 14% 10% 16%; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #aab0d6 0%, #8d93bd 100%);
+  box-shadow: inset 0 3px 4px rgba(40, 44, 90, 0.45), 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+/* três frisos em relevo */
+.tampa::after {
+  content: ''; position: absolute; left: 33%; top: 30%; width: 34%; height: 38%;
+  background: repeating-linear-gradient(90deg, #f1f2fb 0 17%, transparent 17% 41.5%);
+  border-radius: 6px;
+  filter: drop-shadow(0 2px 0 #62679a);
+}
+
+/* vagas: quadrados brancos arredondados em fila */
+.vaga {
+  position: absolute; z-index: 2; border-radius: 16%;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f2f8 100%); box-shadow: 0 4px 0 #c3c6dc, 0 6px 6px rgba(20, 20, 50, 0.18);
+}
+.canos-vagas { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; overflow: visible; }
+
+/* ninhos: bloco arredondado de cor uniforme (só um brilho leve em cima), fio branco em volta, número grande */
+.ninho-vaga, .ninho {
+  --s: color-mix(in srgb, var(--c) 66%, #1d1a33);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 34%) 0 0 / 100% 100% no-repeat,
+    var(--c);
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 2px var(--tinta-escura, #262340), 0 5px 4px rgba(20, 20, 50, 0.3);
+  display: grid; place-items: center;
+}
+.ninho-vaga { position: absolute; inset: 0; border-radius: 16%; --vf: max(20px, calc(var(--vs) * 0.48)); }
+.ninho-vaga .n, .ninho .n { font-family: var(--titulo); font-weight: 700; line-height: 1.12; font-size: var(--vf); letter-spacing: 0.02em; }
+.ninho .n { font-size: calc(var(--nh) * 0.5); }
+.ninho-vaga[data-len="3"] .n { font-size: max(18px, calc(var(--vs) * 0.34)); }
+.ninho-vaga[data-len="4"] .n { font-size: max(16px, calc(var(--vs) * 0.27)); }
+.ninho[data-len="3"] .n { font-size: calc(var(--nh) * 0.42); }
+.ninho[data-len="4"] .n { font-size: calc(var(--nh) * 0.34); }
+.ninho-vaga .simb, .ninho .simb { position: absolute; left: 5px; top: 4px; line-height: 0; }
+.ninho-vaga .simb { left: 3px; top: 2px; }
+.ninho-vaga .simb ~ .n { transform: translateY(4px); }
+.ninho .simb ~ .n { transform: translateX(10px); }
+
+.zona-grade { position: relative; flex: none; }
+.grade { position: relative; }
+.canos { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; overflow: visible; }
+.ninho { position: absolute; z-index: 1; padding: 0; border-radius: 18px; }
+.ninho[hidden] { display: none; }
+.ninho.frente:active { transform: translateY(3px); }
+/* fileiras de trás: menores e esmaecidas (o número continua legível) */
+.ninho.atras { transform: scale(0.92); filter: saturate(0.7) brightness(0.86); box-shadow: 0 0 0 2px rgba(38, 35, 64, 0.6); border-color: rgba(255, 255, 255, 0.5); }
+.ninho.atras .n { opacity: 0.82; }
+.ninho.misterio { background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.28) 0 14%, transparent 15%), radial-gradient(circle at 72% 70%, rgba(255, 255, 255, 0.2) 0 10%, transparent 11%), linear-gradient(180deg, #a3a7c8, #858aae); border-style: dashed; }
+.ninho.misterio .n { opacity: 0.95; }
+.ninho.revelou { animation: revela 0.45s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes revela { 0% { transform: scale(0.7) rotate(-6deg); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
+.ninho.atras.d2 { transform: scale(0.86); filter: saturate(0.55) brightness(0.78); opacity: 0.85; }
+.mais {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 26px; display: flex; align-items: center; justify-content: center; gap: 10px; pointer-events: none;
+}
+.mais .pilula {
+  height: 24px; line-height: 24px; padding: 0 12px; white-space: nowrap;
+  font-family: var(--titulo); font-weight: 700; font-size: 18px; color: #fff; background: #474b7a; border-radius: 12px;
+}
+.mais:empty { display: none; }
+
+/* barra de baixo roxa com botões bege redondinhos (como a do Colony) */
+.jogo .botoes {
+  background: linear-gradient(180deg, #c48ef0 0%, #a96ee0 100%); border-radius: 26px; padding: 8px 10px 12px;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), 0 4px 0 #7a46ad; width: 100%;
+}
+.btn.bege {
+  background: linear-gradient(180deg, #fffaf0 0%, #f7e9d2 60%, #ecd6b4 100%); color: var(--tinta-escura);
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 -4px 0 #dcc29b, 0 4px 0 var(--tinta-escura);
+}
+.btn.bege:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 -4px 0 #dcc29b, 0 2px 0 var(--tinta-escura); }
+.btn.bege.apagado { opacity: 0.55; }
+
+.botoes .btn { padding: 0 clamp(10px, 3vw, 18px); font-size: clamp(15px, 4.2vw, 19px); gap: 6px; }
+.botoes { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: nowrap; }
+.treme { animation: treme 0.3s; }
+@keyframes treme { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.jogo.paisagem { grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 16px; }
+.jogo.paisagem .palco { grid-column: 1; grid-row: 1 / span 3; }
+.jogo.paisagem .topo { grid-column: 2; grid-row: 1; }
+.jogo.paisagem .zona-grade { grid-column: 2; grid-row: 2; align-self: center; }
+.jogo.paisagem .botoes { grid-column: 2; grid-row: 3; }
+
+.cortina { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(251, 246, 238, 0.82); }
+.jogo .cortina { background: rgba(38, 35, 64, 0.62); }
+.cartao {
+  background: #fff; border: 3px solid var(--tinta); box-shadow: 0 5px 0 var(--tinta); border-radius: 28px; padding: 22px 26px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: min(92%, 460px);
+}
+.cartao h2 { font-size: 34px; }
+.cartao p { margin: 0; font-size: 20px; }
+.cartao .faixa { font-size: 22px; line-height: 1.3; }
+.cartao .festa { font-size: 48px; line-height: 1.2; }
+
+/* ----- telas de menu (início, mapa, ajustes, tutorial): mesmo visual azul-arroxeado do jogo ----- */
+.inicio, .mapa, .ajustes, .tutorial, .camada-tutorial { --tinta-escura: #262340; color: #fff; }
+/* títulos: branco com contorno escuro e sombra (como "Fase 11" no jogo) */
+.inicio h1, .mapa .topo h2, .ajustes .topo h2, .progr, .passo-n {
+  color: #fff; -webkit-text-stroke: 0.2em var(--tinta-escura); paint-order: stroke fill; letter-spacing: 0.01em;
+}
+.inicio h1, .mapa .topo h2, .ajustes .topo h2 { text-shadow: 0 4px 0 var(--tinta-escura); }
+/* botão verde (o principal: Jogar, Próximo), como o "2x" verde do jogo */
+.btn.verde {
+  background: linear-gradient(180deg, #a6ef6c 0%, #55c22e 100%); color: #fff;
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), 0 4px 0 var(--tinta-escura);
+  font-family: var(--titulo); font-weight: 700; -webkit-text-stroke: 0.12em var(--tinta-escura); paint-order: stroke fill;
+}
+.btn.verde:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.5), 0 2px 0 var(--tinta-escura); }
+.inicio .btn, .mapa .btn, .ajustes .btn, .tutorial .btn { border-radius: 20px; }
+.inicio .btn.bege, .mapa .btn.bege, .ajustes .btn.bege, .tutorial .btn.bege { font-family: var(--titulo); font-weight: 700; }
+
+/* ----- início ----- */
+.inicio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.inicio h1 { font-size: clamp(44px, 12vw, 78px); line-height: 1.1; }
+.inicio .sub { text-wrap: balance; margin: 0; font-size: clamp(19px, 4.4vw, 25px); max-width: 520px; font-weight: 800; color: #f1f2ff; text-shadow: 0 2px 0 rgba(38, 35, 64, 0.55); }
+.fila-formigas { display: flex; gap: 6px; filter: drop-shadow(0 4px 0 rgba(38, 35, 64, 0.35)); }
+.fila-formigas span { width: clamp(44px, 12vw, 76px); animation: pula 1.6s ease-in-out infinite; display: block; }
+.fila-formigas .ant { width: 100%; display: block; }
+@keyframes pula { 50% { transform: translateY(-8px); } }
+.botoes-inicio { display: flex; flex-direction: column; gap: 16px; width: min(86%, 340px); margin-top: 8px; }
+.botoes-inicio .btn { width: 100%; }
+.rodape { margin: 4px 0 0; font-size: 18px; color: #dcdff7; font-weight: 700; }
+@media (min-aspect-ratio: 11/10) {
+  .inicio { gap: 6px; }
+  .fila-formigas span { width: 44px; }
+  .botoes-inicio { flex-direction: row; width: auto; margin-top: 6px; gap: 12px; }
+  .botoes-inicio .btn { width: auto; height: 58px; font-size: 22px; padding: 0 24px; }
+}
+
+/* ----- mapa ----- */
+.mapa { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.mapa .topo { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mapa .topo h2 { font-size: 32px; }
+.progr { font-family: var(--titulo); font-weight: 700; font-size: 22px; min-width: 84px; text-align: right; }
+.abas { display: flex; gap: 8px; width: 100%; padding-bottom: 4px; }
+.aba {
+  flex: 1; min-height: 56px; border-radius: 18px; color: var(--tinta-escura);
+  background: linear-gradient(180deg, #fffaf0 0%, #f7e9d2 60%, #ecd6b4 100%);
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 -4px 0 #dcc29b, 0 4px 0 var(--tinta-escura);
+  font-family: var(--titulo); font-weight: 700; font-size: clamp(15px, 4vw, 20px); line-height: 1.1; padding: 0 4px;
+}
+.aba.ativa {
+  color: #fff; -webkit-text-stroke: 0.14em var(--tinta-escura); paint-order: stroke fill;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 45%), var(--g);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.18), 0 4px 0 var(--tinta-escura);
+}
+.sub-aba { margin: 0; font-size: 19px; font-weight: 800; color: #eef0ff; }
+.grade-fases {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; width: 100%;
+  align-content: start; flex: 1; min-height: 0; overflow-y: auto; padding: 4px 4px 10px;
+}
+/* cada fase = bloco 3D arredondado, como os ninhos do jogo */
+.fase {
+  --c: #8f94c4; position: relative; aspect-ratio: 1; min-height: 56px; border-radius: 20px; color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0) 40%), var(--c);
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.16), 0 0 0 2.5px var(--tinta-escura), 0 5px 0 2px var(--tinta-escura);
+  font-family: var(--titulo); font-weight: 700; font-size: 28px;
+  -webkit-text-stroke: 0.2em var(--tinta-escura); paint-order: stroke fill;
+}
+.fase:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.16), 0 0 0 2.5px var(--tinta-escura), 0 2px 0 2px var(--tinta-escura); }
+.fase.ganha { --c: #4fbf2c; }
+.fase.atual { --c: #ff9a1f; background: linear-gradient(180deg, #ffd36a 0%, #ff9a1f 100%); animation: fase-atual 1.6s ease-in-out infinite; z-index: 1; }
+@keyframes fase-atual { 50% { transform: scale(1.06); } }
+.fase:disabled { --c: #7c81ad; opacity: 0.6; box-shadow: 0 0 0 2.5px rgba(38, 35, 64, 0.7); border-color: rgba(255, 255, 255, 0.45); }
+.fase .cad { width: 42%; max-width: 30px; height: auto; display: block; margin: auto; fill: #fff; stroke: var(--tinta-escura); stroke-width: 2.5; stroke-linejoin: round; }
+/* selo com o "certo" na fase ganha */
+.fase .ok {
+  position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; border: 2.5px solid var(--tinta-escura); display: grid; place-items: center;
+}
+.fase .ok svg { width: 15px; height: 15px; fill: none; stroke: #2f9e55; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.breve { grid-column: 1 / -1; text-align: center; font-size: 22px; }
+@media (min-aspect-ratio: 11/10) {
+  .grade-fases { grid-template-columns: repeat(10, 1fr); gap: 10px; }
+  .mapa { gap: 6px; }
+  .fase { min-height: 56px; }
+}
+
+/* ----- tutorial ----- */
+.tutorial { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 6px; }
+.tutorial .pular { position: absolute; right: 0; top: 0; height: 48px; font-size: 19px; z-index: 2; padding: 0 18px; }
+.passo-n { font-family: var(--titulo); font-weight: 700; font-size: 20px; }
+.ilus { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 160px; }
+.ilus.col { flex-direction: column; gap: 10px; }
+.ilus svg { max-width: 100%; height: auto; }
+.texto-tut { margin: 0; font-size: clamp(21px, 5.2vw, 30px); line-height: 1.25; max-width: 560px; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(38, 35, 64, 0.6); text-wrap: balance; }
+.texto-tut b { color: #ffe27a; }
+.pontos { display: flex; gap: 8px; }
+.pontos i { width: 13px; height: 13px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.pontos i.on { background: #fff; box-shadow: 0 0 0 2.5px var(--tinta-escura); }
+.nav-tut { display: flex; gap: 12px; }
+@media (min-aspect-ratio: 11/10) {
+  .tutorial { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto auto auto; column-gap: 16px; row-gap: 8px; align-content: center; align-items: center; }
+  .tutorial .passo-n { grid-column: 2; grid-row: 1; }
+  .tutorial .ilus { grid-column: 1; grid-row: 2 / span 4; }
+  .tutorial .texto-tut { grid-column: 2; grid-row: 2; font-size: 22px; }
+  .tutorial .pontos { grid-column: 2; grid-row: 3; justify-self: center; }
+  .tutorial .nav-tut { grid-column: 2; grid-row: 4; justify-content: center; }
+  .tutorial .pular { top: -4px; }
+  .ilus svg { max-height: 190px; }
+}
+
+.cartao .acoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+@media (max-height: 460px) {
+  .cartao { padding: 10px 18px; gap: 6px; max-width: min(94%, 600px); }
+  .cartao .festa { font-size: 28px; }
+  .cartao h2 { font-size: 26px; }
+  .cartao p { font-size: 17px; }
+  .cartao .faixa { font-size: 18px; }
+  .cartao .btn.grande { height: 52px; font-size: 21px; padding: 0 22px; }
+  .cartao .btn { height: 48px; font-size: 17px; }
+}
+
+.aviso { position: absolute; transform: translate(-50%, -50%); z-index: 20; background: var(--tinta); color: #fff; padding: 12px 20px; border-radius: 22px; font-size: 20px; font-weight: 800; width: max-content; max-width: calc(100% - 32px); text-align: center; text-wrap: balance; pointer-events: none; animation: some 2.2s forwards; }
+@keyframes some { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (min-width: 700px) and (min-height: 700px) {
+  .btn { height: 58px; font-size: 21px; }
+  .btn.redondo { width: 58px; }
+  .tutorial .pular { height: 58px; font-size: 20px; }
+  .fase { font-size: 34px; }
+  .ilus svg { transform: scale(1.25); transform-origin: center; }
+  .ilus { min-height: 220px; }
+}
+
+.camada-tutorial { position: fixed; inset: 0; z-index: 50; background: linear-gradient(180deg, #6a70a0 0%, #60669a 45%, #585d8a 100%); display: flex; flex-direction: column; padding: max(14px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.camada-tutorial > .tutorial { flex: 1; width: 100%; min-height: 0; }
+
+/* ----- ajustes ----- */
+.ajustes { display: flex; flex-direction: column; gap: 18px; align-items: center; }
+.ajustes .topo { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+.ajustes .topo h2 { font-size: 32px; }
+.lista-ajustes { display: flex; flex-direction: column; gap: 14px; width: min(100%, 640px); }
+/* cartão bege em relevo, como os botões bege do jogo */
+.linha-ajuste {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; min-height: 88px;
+  color: var(--tinta-escura); border-radius: 22px; padding: 14px 16px;
+  background: linear-gradient(180deg, #fffaf0 0%, #f7e9d2 60%, #ecd6b4 100%);
+  border: 3px solid var(--tinta-escura); box-shadow: inset 0 -5px 0 #dcc29b, 0 5px 0 var(--tinta-escura);
+}
+.linha-ajuste:active { transform: translateY(2px); box-shadow: inset 0 -5px 0 #dcc29b, 0 3px 0 var(--tinta-escura); }
+.linha-ajuste .txt { display: flex; flex-direction: column; gap: 4px; }
+.linha-ajuste b { font-family: var(--titulo); font-weight: 700; font-size: 23px; }
+.linha-ajuste small { font-size: 17px; font-weight: 700; line-height: 1.25; color: #4d4868; }
+.linha-ajuste .chave { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
+.linha-ajuste .chave i { display: block; width: 68px; height: 36px; border-radius: 18px; background: #b9bcd6; position: relative; border: 3px solid var(--tinta-escura); box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.15); }
+.linha-ajuste .chave i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid var(--tinta-escura); transition: left .15s; }
+.linha-ajuste.ligado .chave i { background: #55c22e; }
+.linha-ajuste.ligado .chave i::after { left: 34px; }
+.linha-ajuste .chave em { font-style: normal; font-weight: 800; font-size: 15px; }
+
+/* ===== Telas de início / mapa / tutorial / ajustes (seção do agente das telas de menu) ===== */
+.ilus svg.cena { width: 100%; max-width: 400px; height: auto; max-height: 38dvh; transform: none; }
+.ilus svg.cena text { font-family: var(--titulo); font-weight: 700; }
+@media (min-aspect-ratio: 11/10) {
+  .tutorial { padding-top: 54px; }
+  .ilus svg.cena { max-width: 100%; max-height: min(300px, 70dvh); }
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  .ilus svg.cena { max-width: 580px; max-height: 46dvh; transform: none; }
+  .ilus { min-height: 0; }
+  .tutorial .texto-tut { font-size: 28px; max-width: 640px; }
+}
+
+/* nome do nível pequeno, acima de "Fase N" */
+.jogo .topo h2 { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.jogo .topo h2 .nivel { font-size: 0.42em; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; margin-bottom: 2px; opacity: 0.95; text-shadow: none; -webkit-text-stroke: 0.25em var(--tinta-escura); }
