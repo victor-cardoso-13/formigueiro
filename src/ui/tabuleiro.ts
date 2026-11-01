@@ -317,7 +317,8 @@ export function desenharCamada(canvas: HTMLCanvasElement, m: Medidas, formigas: 
     const prog = Math.min(total, f.prog + frac * REGRAS.VELOCIDADE);
     const p = posicaoNoCaminho(f.caminho, f.acumulado, prog);
     const resto = total - prog;
-    const esc = f.fase === 'volta' && resto < 0.07 ? Math.max(0.35, resto / 0.07) : 1;
+    // encolhe ao entrar no buraco e nasce pequenina ao sair do ninho (para não tampar o número da vaga)
+    const esc = f.fase === 'volta' && resto < 0.07 ? Math.max(0.35, resto / 0.07) : f.fase === 'ida' && prog < 0.1 ? Math.max(0.3, prog / 0.1) : 1;
     desenharFormiga(ctx, px(m, p.x), py(m, p.y), p.ang, L, f.cor, f.fase === 'volta', prog * 90, esc, dpr);
   }
   // poeirinha
