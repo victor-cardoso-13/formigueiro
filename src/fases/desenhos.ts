@@ -7,6 +7,8 @@ export interface Desenho {
   linhas: string[];
 }
 
+import { espelhar, normalizar } from './geradores.ts';
+
 export const DESENHOS_PEQUENOS: Desenho[] = [
   { nome: 'Coração', linhas: [
     '.rr..rr.',
@@ -122,3 +124,111 @@ export const DESENHOS_PEQUENOS: Desenho[] = [
     'bbbbbbbbbbbb',
   ] },
 ];
+
+/** Desenhos médios feitos à mão (os com "espelhar" foram desenhados só pela metade esquerda). */
+export const DESENHOS_MEDIOS: Desenho[] = [
+  { nome: 'Abacaxi', linhas: normalizar([
+    '....g..g...',
+    '...g.ggg.g..',
+    '....ggggg...',
+    '.....ggg....',
+    '...yoyoyoy..',
+    '..oyoyoyoyo.',
+    '..yoyoyoyoy.',
+    '..oyoyoyoyo.',
+    '..yoyoyoyoy.',
+    '..oyoyoyoyo.',
+    '..yoyoyoyoy.',
+    '...oyoyoyo..',
+    '....yoyoy...',
+  ]) },
+  { nome: 'Melancia', linhas: [
+    '..gggggggggggg..',
+    '.gwwwwwwwwwwwwg.',
+    'gwrrrrrrrrrrrrwg',
+    'gwrrdrrrrdrrrrwg',
+    '.gwrrrrrdrrrrwg.',
+    '..gwrrrrrrrrwg..',
+    '...gwrrdrrrwg...',
+    '....gwrrrrwg....',
+  ] },
+  { nome: 'Joaninha', linhas: espelhar([
+    '...dddd',
+    '..ddwdd',
+    '.rrrrrd',
+    'rrdrrrd',
+    'rrrrrrd',
+    'rrrdrrd',
+    'rrrrrrd',
+    'rdrrrrd',
+    '.rrrrrd',
+    '..rrrrd',
+    '...rrrd',
+  ]) },
+  { nome: 'Borboleta', linhas: espelhar([
+    '.pppp..d',
+    'pppkpp.d',
+    'ppkkkpdd',
+    'pkkykkpd',
+    'ppkkkppd',
+    '.pppppdd',
+    '.ppkkp.d',
+    '..pppp.d',
+    '...pp..d',
+  ]) },
+  { nome: 'Sorvete', linhas: espelhar([
+    '.....r',
+    '....rr',
+    '...kkk',
+    '..kkkk',
+    '.kkwkk',
+    '.kkkkk',
+    'wwwwww',
+    '.wwwww',
+    '..wwww',
+    'mmmmmm',
+    '.ymymy',
+    '..mymy',
+    '...mym',
+    '....my',
+    '.....m',
+  ]) },
+  { nome: 'Girassol', linhas: espelhar([
+    '...yyyy',
+    '.yyyyyy',
+    '.yyoooo',
+    'yyoommm',
+    'yyommmm',
+    'yyommmm',
+    'yyommmm',
+    'yyoommm',
+    '.yyoooo',
+    '.yyyyyy',
+    '...yyyy',
+    '......g',
+    '..gg..g',
+    '.ggg..g',
+    '......g',
+  ]) },
+  { nome: 'Coruja', linhas: espelhar([
+    'mm.....',
+    'mmmmmmm',
+    'mmmmmmm',
+    'mwwwmmm',
+    'mwdwmmm',
+    'mwwwmoo',
+    'mmmmmmo',
+    'mmyymmm',
+    'mmyyymm',
+    'mmyymmm',
+    'mmyyymm',
+    '.mmmmmm',
+    '..oo..o',
+  ]) },
+];
+
+/** Cores "primas" para dar mais cores a um desenho ampliado (colcha de retalhos). */
+export const PRIMAS: Record<string, string[]> = {
+  r: ['k', 'o'], o: ['y', 'r'], y: ['o', 'w'], g: ['c', 'y'], b: ['c', 'p'], c: ['b', 'g'],
+  p: ['k', 'b'], k: ['r', 'p'], m: ['o', 'd'], d: ['b', 'p'], w: ['c', 'y'],
+};

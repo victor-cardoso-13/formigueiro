@@ -22,20 +22,21 @@ async function jogarSolucao(id) {
   const f = fases.find((x) => x.id === id);
   await page.goto(`http://localhost:${porta}/?limpo=1&visto=1&tela=jogo&fase=${id}&teste=1`);
   await page.waitForSelector('.tile');
+  if (await page.$('#cEntendi')) await page.click('#cEntendi');
   await page.click('#bVel');
   await page.click('#bVel'); // 5×
   for (const t of f.solucao) {
     const seletor = t >= 10 ? `[data-e="${t - 10}"]` : `[data-c="${t}"] .tile`;
     await page.click(seletor);
     await esperarTrilhaVazia().catch(() => {});
-    if (await page.$('.cartao')) break;
+    if (await page.$('.cortina:not([hidden]) .cartao')) break;
   }
-  await page.waitForSelector('.cartao h2', { timeout: 10000 });
-  return page.textContent('.cartao h2');
+  await page.waitForSelector('.cortina:not([hidden]) .cartao h2', { timeout: 10000 });
+  return page.textContent('.cortina:not([hidden]) .cartao h2');
 }
 
 // 1) vitória seguindo a solução
-for (const id of [1, 9, 10]) {
+for (const id of [1, 9, 16, 36, 41, 60]) {
   const titulo = await jogarSolucao(id);
   console.log(`fase ${id}:`, titulo);
   if (titulo !== 'Ganhou!') falhar(`fase ${id} não terminou em Ganhou!`);
@@ -60,8 +61,8 @@ await page.evaluate(() => {
   e.colunas[1][0].fome = 999;
 });
 await page.click('[data-c="1"] .tile');
-await page.waitForSelector('.cartao h2', { timeout: 20000 });
-const t2 = await page.textContent('.cartao h2');
+await page.waitForSelector('.cortina:not([hidden]) .cartao h2', { timeout: 20000 });
+const t2 = await page.textContent('.cortina:not([hidden]) .cartao h2');
 console.log('derrota:', t2, '·', await page.textContent('.cartao p'));
 if (t2 !== 'Perdeu') falhar('não perdeu');
 await page.click('#cDesfazer');

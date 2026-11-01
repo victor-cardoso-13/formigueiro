@@ -72,3 +72,35 @@ describe('fases congeladas', () => {
     }
   });
 });
+
+describe('peças especiais e faixas', () => {
+  const por = (id: number) => fases.find((f) => f.id === id);
+  it('a 1ª fase de cada peça nova tem a peça e a faixa de apresentação', () => {
+    if (fases.length < 41) return;
+    expect(por(16)?.especiais).toContain('folha');
+    expect(por(16)?.faixa).toBeTruthy();
+    expect(por(36)?.especiais).toContain('duro');
+    expect(por(36)?.faixa).toBeTruthy();
+    expect(por(41)?.especiais).toContain('dorminhoca');
+    expect(por(41)?.faixa).toBeTruthy();
+  });
+  it('antes de cada peça nova, as fases não a usam', () => {
+    for (const f of fases) {
+      if (f.id < 16) expect(f.especiais).not.toContain('folha');
+      if (f.id < 36) expect(f.especiais).not.toContain('duro');
+      if (f.id < 41) expect(f.especiais).not.toContain('dorminhoca');
+    }
+  });
+  it('desenhos têm entre 8×7 e 24×24 e cores dentro do esperado por grupo', () => {
+    const limites = { facil: [2, 3], media: [3, 5], dificil: [4, 7], 'muito-dificil': [7, 9] } as const;
+    for (const f of fases) {
+      expect(f.largura).toBeGreaterThanOrEqual(8);
+      expect(f.largura).toBeLessThanOrEqual(24);
+      expect(f.altura).toBeLessThanOrEqual(24);
+      const cores = new Set(f.desenho.join('').replace(/\./g, '')).size;
+      const [min, max] = limites[f.grupo];
+      expect(cores, `fase ${f.id}`).toBeGreaterThanOrEqual(min);
+      expect(cores, `fase ${f.id}`).toBeLessThanOrEqual(max);
+    }
+  });
+});

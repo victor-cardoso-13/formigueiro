@@ -35,6 +35,8 @@ export interface Parametros {
   fomeMax: number;
   /** chance de uma formiga nova ter fome a mais (vai para a espera e volta) */
   pSobra: number;
+  /** tamanho máximo da sobra de fome */
+  sobraMax: number;
   /** quantas formigas esperando ao mesmo tempo, no máximo, na solução */
   maxEspera: number;
   /** chance de reaproveitar uma formiga da espera quando ela já consegue terminar */
@@ -45,10 +47,10 @@ export interface Parametros {
 }
 
 export const PADRAO: Record<Grupo, Parametros> = {
-  facil: { colunas: 2, fomeMin: 4, fomeMax: 20, pSobra: 0, maxEspera: 2, pReuso: 0.5, folhas: 0, duros: 0, dorminhocas: 0 },
-  media: { colunas: 3, fomeMin: 5, fomeMax: 30, pSobra: 0.15, maxEspera: 3, pReuso: 0.4, folhas: 0, duros: 0, dorminhocas: 0 },
-  dificil: { colunas: 4, fomeMin: 5, fomeMax: 40, pSobra: 0.3, maxEspera: 3, pReuso: 0.35, folhas: 0.06, duros: 0, dorminhocas: 0 },
-  'muito-dificil': { colunas: 5, fomeMin: 5, fomeMax: 50, pSobra: 0.4, maxEspera: 4, pReuso: 0.3, folhas: 0.08, duros: 0.08, dorminhocas: 4 },
+  facil: { colunas: 2, fomeMin: 4, fomeMax: 20, pSobra: 0, sobraMax: 3, maxEspera: 2, pReuso: 0.5, folhas: 0, duros: 0, dorminhocas: 0 },
+  media: { colunas: 3, fomeMin: 5, fomeMax: 30, pSobra: 0.15, sobraMax: 3, maxEspera: 3, pReuso: 0.4, folhas: 0.05, duros: 0, dorminhocas: 0 },
+  dificil: { colunas: 4, fomeMin: 5, fomeMax: 40, pSobra: 0.3, sobraMax: 3, maxEspera: 3, pReuso: 0.35, folhas: 0.06, duros: 0.06, dorminhocas: 2 },
+  'muito-dificil': { colunas: 5, fomeMin: 5, fomeMax: 50, pSobra: 0.4, sobraMax: 3, maxEspera: 4, pReuso: 0.3, folhas: 0.08, duros: 0.08, dorminhocas: 4 },
 };
 
 export const FAIXA: Record<Grupo, [number, number]> = {
@@ -171,7 +173,7 @@ export function planejar(desenhoInicial: (Celula | null)[][], p: Parametros, rng
     const idx = formigas.length;
     if (pendentes.length < p.maxEspera && rng() < p.pSobra && comer >= 2 && escolha.pot <= alvoFome) {
       // come tudo o que dá e ainda fica com fome: vai esperar
-      const sobra = inteiro(rng, 1, 3);
+      const sobra = inteiro(rng, 1, Math.max(1, p.sobraMax));
       const restante = somaMordidas(desenho, escolha.cor) - reservado(escolha.cor) - comer;
       if (restante >= sobra) {
         fome = comer + sobra;
@@ -289,6 +291,8 @@ export interface Entrada {
   /** substitui partes de PADRAO[grupo] */
   param?: Partial<Parametros>;
   partidas?: number;
+  /** dureza inicial (0..1) */
+  dureza?: number;
 }
 
 function sorteiaCelulas(desenho: (Celula | null)[][], fracao: number, rng: Rng, exclui = new Set<string>()): [number, number][] {
@@ -353,22 +357,43 @@ export interface Resultado {
   param: Parametros;
 }
 
-/** Gera a fase ajustando a dificuldade até a taxa de partidas ao acaso cair na faixa do grupo. */
+/** Parâmetros para uma "dureza" d entre 0 (folgado) e 1 (apertado). */
+export function parametrosDe(grupo: Grupo, d: number, extra: Partial<Parametros> = {}): Parametros {
+  const base = PADRAO[grupo];
+  return {
+    ...base,
+    fomeMax: Math.round(base.fomeMax * (1 + d)),
+    pSobra: 0.95 * d,
+    sobraMax: 1 + Math.round(d * (grupo === 'facil' ? 2 : 10)),
+    maxEspera: d < 0.34 ? 2 : d < 0.67 ? 3 : 4,
+    pReuso: 0.5 - 0.42 * d,
+    ...extra,
+  };
+}
+
+const DUREZA_INICIAL: Record<Grupo, number> = { facil: 0, media: 0.45, dificil: 0.75, 'muito-dificil': 0.9 };
+
+/** Gera a fase ajustando a dureza (bisseção) até a taxa de partidas ao acaso cair na faixa do grupo. */
 export function gerarFase(ent: Entrada, maxTentativas = 14): Resultado {
   const [lo, hi] = FAIXA[ent.grupo];
-  let p: Parametros = { ...PADRAO[ent.grupo], ...ent.param };
   const esp = ent.especiais ?? {};
-  if (!esp.folha) p.folhas = 0;
-  if (!esp.duro) p.duros = 0;
-  if (!esp.dorminhoca) p.dorminhocas = 0;
+  const fixos: Partial<Parametros> = { ...ent.param };
+  if (!esp.folha) fixos.folhas = 0;
+  if (!esp.duro) fixos.duros = 0;
+  if (!esp.dorminhoca) fixos.dorminhocas = 0;
   let melhor: Resultado | null = null;
   let melhorDist = Infinity;
   const partidas = ent.partidas ?? 300;
+  let minD = 0;
+  let maxD = 1;
+  let d = ent.dureza ?? DUREZA_INICIAL[ent.grupo];
   let falhas = 0;
   for (let t = 0; t < maxTentativas + falhas && t < maxTentativas * 3; t++) {
+    const p = parametrosDe(ent.grupo, d, fixos);
     const fase = montar(ent, p, t);
     if (!fase) {
       falhas++;
+      d = Math.max(0, d - 0.05); // soluções muito apertadas às vezes emperram
       continue;
     }
     const taxa = taxaAleatoria(fase, partidas, ent.semente + t);
@@ -379,11 +404,14 @@ export function gerarFase(ent: Entrada, maxTentativas = 14): Resultado {
       melhor = { fase, tentativas: t + 1, naFaixa: dist === 0, param: { ...p } };
     }
     if (dist === 0) break;
-    // ajuste: fácil demais -> mais sobras e mais fome; difícil demais -> menos
     if (taxa > hi) {
-      p = { ...p, pSobra: Math.min(0.9, p.pSobra + 0.12), fomeMax: Math.round(p.fomeMax * 1.15), maxEspera: Math.min(4, p.maxEspera + (t % 3 === 2 ? 1 : 0)) };
+      minD = d;
+      d = Math.min(1, (d + maxD) / 2 + (maxD - d < 0.02 ? 0 : 0));
+      if (maxD - minD < 0.03) maxD = Math.min(1, maxD + 0.1);
     } else {
-      p = { ...p, pSobra: Math.max(0, p.pSobra - 0.12), fomeMax: Math.max(p.fomeMin + 3, Math.round(p.fomeMax * 0.87)) };
+      maxD = d;
+      d = Math.max(0, (d + minD) / 2);
+      if (maxD - minD < 0.03) minD = Math.max(0, minD - 0.1);
     }
   }
   if (!melhor) throw new Error(`Fase ${ent.id} (${ent.nome}): não consegui montar nenhuma solução`);
