@@ -257,11 +257,20 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     const pos = new Map<number, { x: number; y: number; vis: boolean; d: number; grupo?: number }>();
     let escondidos = 0;
     let html = '';
+    // colunas que ainda têm ninho: quando uma acaba, as outras se centralizam (como no Colony Flow)
+    const ativas = colunas.map((col) => col.length > 0);
+    const nAtivas = ativas.filter(Boolean).length;
+    const lugar = new Map<number, number>();
+    ativas.forEach((a, c) => a && lugar.set(c, lugar.size));
+    const margem = ((nCol - nAtivas) / 2) * (cw + CG);
+    // posições de antes (para os ninhos deslizarem até o lugar novo)
+    const antes = new Map<number, { x: number; y: number }>();
+    for (const b of grade.querySelectorAll<HTMLElement>('.ninho')) antes.set(Number(b.dataset.id), { x: parseFloat(b.style.left), y: parseFloat(b.style.top) });
     colunas.forEach((col, c) =>
       col.forEach((n, d) => {
         const vis = d < R;
         if (!vis) escondidos++;
-        const x = c * (cw + CG);
+        const x = margem + (lugar.get(c) ?? c) * (cw + CG);
         const y = d * (nh + RG);
         pos.set(n.id, { x, y, vis, d, grupo: n.grupo });
         const mist = d > 0 && misteriosos.has(n.id);
@@ -308,6 +317,13 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       }
     }
     grade.innerHTML = html;
+    // desliza os ninhos que mudaram de lugar (só no sentido horizontal, quando as colunas se centralizam)
+    for (const b of grade.querySelectorAll<HTMLElement>('.ninho:not([hidden])')) {
+      const antigo = antes.get(Number(b.dataset.id));
+      if (!antigo) continue;
+      const dx = antigo.x - parseFloat(b.style.left);
+      if (Math.abs(dx) > 1) b.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    }
     mais.innerHTML = escondidos > 0 ? `<span class="pilula">+${escondidos} atrás</span>` : '';
     const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}</svg>` : '';
     grade.insertAdjacentHTML('afterbegin', svg);
