@@ -9,10 +9,10 @@ export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): voi
     <h1>Formigueiro</h1>
     <p class="sub">Mande as formigas buscarem o açúcar da cor delas.</p>
     <div class="botoes-inicio">
-      <button class="btn grande ambar" id="bJogar">${continua ? 'Continuar' : 'Jogar'}</button>
-      <button class="btn grande" id="bMapa">Fases</button>
-      <button class="btn grande" id="bAjuda">Como jogar</button>
-      <button class="btn grande" id="bAjustes">Ajustes</button>
+      <button class="btn grande verde" id="bJogar">${continua ? 'Continuar' : 'Jogar'}</button>
+      <button class="btn grande roxo" id="bMapa">Fases</button>
+      <button class="btn grande bege" id="bAjuda">Como jogar</button>
+      <button class="btn grande bege" id="bAjustes">Ajustes</button>
     </div>
     <p class="rodape">Sem anúncios · ${p.ganhas.length} fases ganhas</p>
   </div>`;
