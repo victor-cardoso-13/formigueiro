@@ -291,14 +291,18 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       for (let i = 1; i < vis.length; i++) {
         const a = vis[i - 1];
         const b = vis[i];
+        // cápsula igual à das vagas: só na fresta entre os dois ninhos, entrando um pouquinho em cada um
         if (Math.abs(a.x - b.x) < 1) {
-          // empilhados na mesma coluna (como no Colony): o cano liga o da frente ao de trás, por trás dos dois
-          trechos.push({ d: `M${a.x} ${a.y}V${b.y}`, a, b, corA: cor(a.cor), corB: cor(b.cor) });
+          const pa = { x: a.x, y: a.y + nh * 0.46 }; // empilhados na mesma coluna (como no Colony)
+          const pb = { x: b.x, y: b.y - nh * 0.46 };
+          trechos.push({ d: `M${pa.x} ${pa.y}V${pb.y}`, a: pa, b: pb, corA: cor(a.cor), corB: cor(b.cor) });
+        } else if (Math.abs(a.y - b.y) < 1) {
+          const pa = { x: a.x + cw * 0.44, y: a.y }; // lado a lado
+          const pb = { x: b.x - cw * 0.44, y: b.y };
+          trechos.push({ d: `M${pa.x} ${pa.y}H${pb.x}`, a: pa, b: pb, corA: cor(a.cor), corB: cor(b.cor) });
         } else {
-          // lado a lado: do centro de um ao do outro, por trás dos ninhos (aparece só na fresta)
-          const gx = a.x + cw / 2 + CG / 2;
-          const d = Math.abs(a.y - b.y) >= 1 ? `M${a.x} ${a.y}H${gx}V${b.y}H${b.x}` : `M${a.x} ${a.y}H${b.x}`;
-          trechos.push({ d, a, b, corA: cor(a.cor), corB: cor(b.cor) });
+          const gx = a.x + cw / 2 + CG / 2; // lado a lado em alturas diferentes (fases antigas)
+          trechos.push({ d: `M${a.x} ${a.y}H${gx}V${b.y}H${b.x}`, a, b, corA: cor(a.cor), corB: cor(b.cor) });
         }
       }
     }
