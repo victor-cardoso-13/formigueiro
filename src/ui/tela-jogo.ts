@@ -55,38 +55,33 @@ function estiloCor(cor: number): string {
   return `--c:${c};--d:${escura}`;
 }
 
-/** Um trecho de cano ligando dois ninhos: `d` é o caminho (sempre reto), `cor` a cor do ninho de onde ele sai. */
+/** Um trecho de cano ligando dois ninhos: `d` é o caminho (sempre reto); o cano é metade da cor de cada ninho (de `a` até `b`). */
 interface Trecho {
   d: string;
-  cor: string;
-  /** pontas (para as tampinhas redondas) */
-  de: { x: number; y: number };
-  ate: { x: number; y: number };
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+  corA: string;
+  corB: string;
 }
 
-/** Mistura duas cores "#rrggbb" (t = quanto da segunda). */
-function misturaCor(a: string, b: string, t: number): string {
-  const n = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
-  const [x, y] = [n(a), n(b)];
-  return `#${x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('')}`;
-}
-
-/** Canos no estilo do Colony Flow: haste fina e redonda na cor do ninho de onde sai, com brilho, contorno e tampinhas nas pontas. */
+let contadorCano = 0;
+/** Canos limpos: tubo grosso e redondo, metade na cor de cada ninho, com brilho e sombra. Ficam por trás dos ninhos e só aparecem na fresta entre eles. */
 function canosSvg(trechos: Trecho[], larg: number): string {
   if (!trechos.length) return '';
-  const hastes = trechos
-    .map((t) => {
-      const escura = misturaCor(t.cor, '#1d1a33', 0.62);
-      const tampa = (q: { x: number; y: number }) =>
-        `<circle cx="${q.x}" cy="${q.y}" r="${larg * 0.9}" fill="${t.cor}" stroke="${escura}" stroke-width="3"/><circle cx="${q.x - larg * 0.22}" cy="${q.y - larg * 0.25}" r="${larg * 0.26}" fill="#fff" fill-opacity="0.5"/>`;
-      return `<g class="cano">
-        <path d="${t.d}" stroke="${escura}" stroke-width="${larg + 6}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
-        <path class="corpo" d="${t.d}" stroke="${t.cor}" stroke-width="${larg}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
-        <path d="${t.d}" stroke="#fff" stroke-opacity="0.5" stroke-width="${Math.max(2, larg * 0.26)}" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(0 ${-larg * 0.2})"/>
-        ${tampa(t.de)}${tampa(t.ate)}</g>`;
-    })
+  const id = `cano${contadorCano++}`;
+  const defs = trechos
+    .map(
+      (t, i) =>
+        `<linearGradient id="${id}-${i}" gradientUnits="userSpaceOnUse" x1="${t.a.x}" y1="${t.a.y}" x2="${t.b.x}" y2="${t.b.y}"><stop offset="0.5" stop-color="${t.corA}"/><stop offset="0.5" stop-color="${t.corB}"/></linearGradient>`,
+    )
     .join('');
-  return hastes;
+  const camada = (atributos: string, extra = '') => trechos.map((t, i) => `<path d="${t.d}" ${atributos.replace('GRAD', `url(#${id}-${i})`)} ${extra}/>`).join('');
+  return `<defs>${defs}</defs><g class="cano" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    ${camada(`stroke="#262340" stroke-opacity="0.85" stroke-width="${larg + 6}"`)}
+    <g class="corpo">${camada(`stroke="GRAD" stroke-width="${larg}"`)}</g>
+    ${camada(`stroke="#1d1a33" stroke-opacity="0.2" stroke-width="${larg * 0.45}"`, `transform="translate(${larg * 0.2} ${larg * 0.2})"`)}
+    ${camada(`stroke="#fff" stroke-opacity="0.5" stroke-width="${Math.max(2, larg * 0.2)}"`, `transform="translate(${-larg * 0.2} ${-larg * 0.2})"`)}
+  </g>`;
 }
 
 export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: string): () => void {
@@ -288,41 +283,28 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     );
     const larguraTotal = nCol * cw + (nCol - 1) * CG;
     const alturaGrade = R * nh + (R - 1) * RG;
-    const larg = Math.max(6, Math.round(nh * 0.14));
+    const larg = Math.max(10, Math.round(nh * 0.3));
     const trechos: Trecho[] = [];
-    let misterios = '';
     const cor = (k: number) => PALETA[k].cor;
     for (const membros of porGrupo.values()) {
-      const vis = membros.filter((q) => q.vis).sort((a, b) => a.x - b.x);
-      const escondidosDoGrupo = membros.filter((q) => !q.vis);
+      const vis = membros.filter((q) => q.vis).sort((a, b) => a.x - b.x || a.y - b.y);
       for (let i = 1; i < vis.length; i++) {
         const a = vis[i - 1];
         const b = vis[i];
-        // haste fina, do centro de um ninho ao do outro, por cima, na parte de baixo (o número fica livre)
-        const ya = a.y + nh * 0.36;
-        const yb = b.y + nh * 0.36;
-        let d = `M${a.x} ${ya}H${b.x}`;
-        if (Math.abs(a.y - b.y) >= 1) {
+        if (Math.abs(a.x - b.x) < 1) {
+          // empilhados na mesma coluna (como no Colony): o cano liga o da frente ao de trás, por trás dos dois
+          trechos.push({ d: `M${a.x} ${a.y}V${b.y}`, a, b, corA: cor(a.cor), corB: cor(b.cor) });
+        } else {
+          // lado a lado: do centro de um ao do outro, por trás dos ninhos (aparece só na fresta)
           const gx = a.x + cw / 2 + CG / 2;
-          d = `M${a.x} ${ya}H${gx}V${yb}H${b.x}`;
+          const d = Math.abs(a.y - b.y) >= 1 ? `M${a.x} ${a.y}H${gx}V${b.y}H${b.x}` : `M${a.x} ${a.y}H${b.x}`;
+          trechos.push({ d, a, b, corA: cor(a.cor), corB: cor(b.cor) });
         }
-        trechos.push({ d, cor: cor(a.cor), de: { x: a.x, y: ya }, ate: { x: b.x, y: yb } });
-      }
-      // ligado escondido atrás: a haste desce pelo corredor até uma bolinha "?" (ele vem junto quando o da frente sobe)
-      const daFrente = vis.filter((q) => q.d === 0);
-      if (daFrente.length && escondidosDoGrupo.length) {
-        const de = daFrente[daFrente.length - 1];
-        const dir = de.x + cw / 2 + CG / 2 <= larguraTotal;
-        const gx = dir ? de.x + cw / 2 + CG / 2 : de.x - cw / 2 - CG / 2;
-        const y0 = de.y + nh * 0.36;
-        const yf = alturaGrade + larg * 1.3;
-        trechos.push({ d: `M${de.x} ${y0}H${gx}V${yf}`, cor: cor(de.cor), de: { x: de.x, y: y0 }, ate: { x: gx, y: yf } });
-        misterios += `<text x="${gx}" y="${yf + larg * 0.38}" text-anchor="middle" font-size="${larg * 1.1}" font-weight="800" fill="#262340" font-family="Fredoka, sans-serif">?</text>`;
       }
     }
     grade.innerHTML = html;
     mais.innerHTML = escondidos > 0 ? `<span class="pilula">+${escondidos} atrás</span>` : '';
-    const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}${misterios}</svg>` : '';
+    const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}</svg>` : '';
     grade.insertAdjacentHTML('afterbegin', svg);
   }
 
@@ -355,14 +337,15 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       if (n && n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), i]);
     });
     const vs = m.W * 0.172;
-    const larg = Math.max(6, Math.round(vs * 0.13));
-    const y = py(m, centroVaga(m.h, 0).y) + vs * 0.3;
+    const larg = Math.max(10, Math.round(vs * 0.3));
+    const y = py(m, centroVaga(m.h, 0).y);
     const trechos: Trecho[] = [];
     for (const idx of porGrupo.values()) {
       for (let k = 1; k < idx.length; k++) {
-        const a = px(m, centroVaga(m.h, idx[k - 1]).x);
-        const b = px(m, centroVaga(m.h, idx[k]).x);
-        trechos.push({ d: `M${a} ${y}H${b}`, cor: PALETA[e.vagas[idx[k - 1]]!.cor].cor, de: { x: a, y }, ate: { x: b, y } });
+        // só na fresta entre as vagas (as pontas entram um pouquinho nos ninhos)
+        const a = { x: px(m, centroVaga(m.h, idx[k - 1]).x) + vs * 0.44, y };
+        const b = { x: px(m, centroVaga(m.h, idx[k]).x) - vs * 0.44, y };
+        trechos.push({ d: `M${a.x} ${y}H${b.x}`, a, b, corA: PALETA[e.vagas[idx[k - 1]]!.cor].cor, corB: PALETA[e.vagas[idx[k]]!.cor].cor });
       }
     }
     canosVagas.innerHTML = canosSvg(trechos, larg);

@@ -78,10 +78,7 @@ export function lugarDe(e: Estado, id: number): { linha: number; coluna: number 
   return null;
 }
 
-/**
- * O ninho tocado e os ligados a ele por cano (da esquerda para a direita), ou null se não está na grade.
- * Como no Colony Flow, o ligado vem junto MESMO escondido atrás: basta o tocado estar na frente.
- */
+/** O ninho tocado e os ligados a ele por cano (da esquerda para a direita, de cima para baixo), ou null se não está na grade. */
 export function unidade(e: Estado, id: number): Ninho[] | null {
   const lugar = lugarDe(e, id);
   if (!lugar) return null;
@@ -92,6 +89,26 @@ export function unidade(e: Estado, id: number): Ninho[] | null {
   return membros.sort((a, b) => a.coluna - b.coluna || a.linha - b.linha).map((m) => m.n);
 }
 
+/**
+ * O grupo de cano está "todo à vista"? Em cada coluna, quem está na frente dele tem de ser do próprio grupo:
+ * ou todos estão na primeira fileira (lado a lado), ou estão empilhados na mesma coluna (o da frente e os de trás).
+ */
+function grupoPronto(e: Estado, un: Ninho[]): boolean {
+  if (un.length < 2) return true;
+  const ids = new Set(un.map((n) => n.id));
+  for (let c = 0; c < (e.grade[0]?.length ?? 0); c++) {
+    let acabou = false; // já passou dos do grupo nesta coluna
+    for (let l = 0; l < e.grade.length; l++) {
+      const n = e.grade[l][c];
+      if (!n) continue;
+      if (ids.has(n.id)) {
+        if (acabou) return false; // tem alguém de fora na frente
+      } else acabou = true;
+    }
+  }
+  return true;
+}
+
 export const vagasLivres = (e: Estado): number => e.vagas.filter((v) => !v).length;
 
 /** Por que o toque não vale (para a tela avisar), ou null se vale. */
@@ -99,7 +116,8 @@ export function motivoDeNaoPoder(e: Estado, id: number): 'fim' | 'atras' | 'vaga
   if (e.resultado !== 'jogando') return 'fim';
   const un = unidade(e, id);
   if (!un) return 'atras';
-  if (!frente(e).some((n) => n.id === id)) return 'atras'; // só o tocado precisa estar na frente
+  if (!frente(e).some((n) => n.id === id)) return 'atras'; // só se toca nos da frente
+  if (!grupoPronto(e, un)) return 'atras'; // o cano só vai com o grupo inteiro à vista
   if (vagasLivres(e) < un.length) return 'vagas';
   return null;
 }

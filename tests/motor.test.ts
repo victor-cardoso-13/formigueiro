@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { REGRAS } from '../src/motor/regras.ts';
 import { acumular, centroVaga, buraco, posicaoNoCaminho } from '../src/motor/geometria.ts';
-import { clonar, expostos, frente, motivoDeNaoPoder, novoEstado, parado, passo, podeTocar, rodarAteParar, tocar, unidade } from '../src/motor/colonia.ts';
+import { clonar, expostos, frente, vagasLivres, motivoDeNaoPoder, novoEstado, parado, passo, podeTocar, rodarAteParar, tocar, unidade } from '../src/motor/colonia.ts';
 import { fase } from './ajuda.ts';
 
 describe('quadradinhos expostos', () => {
@@ -177,12 +177,21 @@ describe('formigas', () => {
     expect(lugares.length).toBe(2);
     expect(lugares[1] - lugares[0]).toBe(1);
   });
-  it('o ninho ligado por cano vem junto mesmo escondido atrás (basta o tocado estar na frente)', () => {
-    const e = novoEstado(fase(['0000'], [[{ cor: 0, n: 1, g: 1 }, { cor: 0, n: 1 }], [{ cor: 0, n: 1 }, { cor: 0, n: 1, g: 1 }]]));
-    // ninho 1 (frente, coluna 0) e ninho 4 (atrás, coluna 1) estão ligados
+  it('cano em pilha: o da frente e o de trás, na mesma coluna, sobem juntos', () => {
+    const e = novoEstado(fase(['0000'], [[{ cor: 0, n: 1, g: 1 }, { cor: 0, n: 1 }], [{ cor: 0, n: 1, g: 1 }, { cor: 0, n: 1 }]]));
     expect(podeTocar(e, 1)).toBe(true);
     tocar(e, 1);
-    expect(e.vagas.filter(Boolean).map((v) => v!.id).sort()).toEqual([1, 4]);
+    expect(e.vagas.filter(Boolean).map((v) => v!.id).sort()).toEqual([1, 3]);
+    expect(vagasLivres(e)).toBe(3);
+  });
+  it('cano lado a lado só vai quando todos estão na frente; ligado escondido em outra coluna trava', () => {
+    // ninho 1 (frente, coluna 0) ligado ao 4 (coluna 1, atrás do 2): o 2 está na frente dele
+    const e = novoEstado(fase(['0000'], [[{ cor: 0, n: 1, g: 1 }, { cor: 0, n: 1 }], [{ cor: 0, n: 1 }, { cor: 0, n: 1, g: 1 }]]));
+    expect(podeTocar(e, 1)).toBe(false);
+    expect(motivoDeNaoPoder(e, 1)).toBe('atras');
+    tocar(e, 2); // o 2 sai da frente
+    rodarAteParar(e);
+    expect(podeTocar(e, 1)).toBe(true);
   });
   it('cada quadradinho só é escolhido por uma formiga', () => {
     const e = novoEstado(fase(['00', '00'], [[{ cor: 0, n: 4 }]]));

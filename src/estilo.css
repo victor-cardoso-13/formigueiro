@@ -182,7 +182,7 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
 
 .zona-grade { position: relative; flex: none; }
 .grade { position: relative; }
-.canos { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; overflow: visible; }
+.canos { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; overflow: visible; }
 .ninho { position: absolute; z-index: 1; padding: 0; border-radius: 18px; }
 .ninho[hidden] { display: none; }
 .ninho.frente:active { transform: translateY(3px); }

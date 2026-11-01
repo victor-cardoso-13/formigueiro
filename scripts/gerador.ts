@@ -164,8 +164,7 @@ function planejar(desenho: string[], P: Parametros, rng: Rng): Unidade[] {
  * isso garante que a solução (ordem do planejamento) sempre tem o ninho na frente na hora de tocar.
  * `mistura` = chance de um ninho avulso ir para a "pista" da sua posição no plano (colunas viram trechos do plano: os ninhos
  * da frente ficam "do futuro", com a cor ainda escondida, e viram armadilhas); senão (e sempre para canos) vai para onde as
- * pilhas estão mais baixas (linhas quase completas). Um grupo (cano) ocupa colunas vizinhas na mesma linha; colunas mais baixas
- * ganham lugar vazio (null) até a linha dele. Cada coluna é limitada a uma altura "justa" para a grade ficar compacta.
+ * pilhas estão mais baixas (linhas quase completas). Um grupo (cano) fica EMPILHADO na mesma coluna (o da frente e os de trás), como no Colony Flow. Cada coluna é limitada a uma altura "justa" para a grade ficar compacta.
  */
 function montarGrade(unidades: Unidade[], colunas: number, mistura: number, rng: Rng): { grade: (NinhoFase | null)[][]; solucao: number[] } {
   type Cel = { ninho: NinhoFase; unidade: Unidade } | null;
@@ -177,20 +176,16 @@ function montarGrade(unidades: Unidade[], colunas: number, mistura: number, rng:
   const altura = (c: number) => pilhas[c].length;
   unidades.forEach((u, i) => {
     const s = u.ninhos.length;
-    const opcoes = colunas - s + 1;
-    // pista do plano (só para ninhos avulsos; canos vão para onde as pilhas estão mais baixas)
+    // pista do plano (só para ninhos avulsos)
     const pista = Math.min(colunas - 1, Math.floor(((i + rng()) / total) * colunas));
     let c0 = -1;
     if (s === 1 && rng() < mistura && altura(pista) < limite) c0 = pista;
     if (c0 < 0) {
+      // vai para onde a pilha está mais baixa (grade compacta); cano = ninhos EMPILHADOS na mesma coluna, como no Colony
       let melhor = Infinity;
       const empates: number[] = [];
-      for (let c = 0; c < opcoes; c++) {
-        let alt = 0;
-        let lacuna = 0;
-        for (let k = 0; k < s; k++) alt = Math.max(alt, altura(c + k));
-        for (let k = 0; k < s; k++) lacuna += alt - altura(c + k);
-        const custo = alt * 100 + lacuna;
+      for (let c = 0; c < colunas; c++) {
+        const custo = altura(c);
         if (custo < melhor) {
           melhor = custo;
           empates.length = 0;
@@ -199,14 +194,8 @@ function montarGrade(unidades: Unidade[], colunas: number, mistura: number, rng:
       }
       c0 = empates[Math.floor(rng() * empates.length)];
     }
-    let linha = 0;
-    for (let k = 0; k < s; k++) linha = Math.max(linha, pilhas[c0 + k].length);
     const gid = s > 1 ? ++g : undefined;
-    u.ninhos.forEach((n, k) => {
-      const pilha = pilhas[c0 + k];
-      while (pilha.length < linha) pilha.push(null);
-      pilha.push({ ninho: gid === undefined ? { cor: n.cor, n: n.n } : { cor: n.cor, n: n.n, g: gid }, unidade: u });
-    });
+    u.ninhos.forEach((n) => pilhas[c0].push({ ninho: gid === undefined ? { cor: n.cor, n: n.n } : { cor: n.cor, n: n.n, g: gid }, unidade: u }));
   });
   const alturaFinal = Math.max(...pilhas.map((p) => p.length));
   const linhas: Cel[][] = Array.from({ length: alturaFinal }, (_, l) => pilhas.map((p) => p[l] ?? null));
