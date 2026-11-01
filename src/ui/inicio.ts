@@ -1,10 +1,12 @@
 import { formigaSvg } from './formiga.ts';
+import { rotuloDoChip } from './conta.ts';
 import { progresso } from './salvar.ts';
 
-export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): void; ajuda(): void; ajustes(): void }) {
+export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): void; ajuda(): void; ajustes(): void; conta(): void }) {
   const p = progresso();
   const continua = p.ganhas.length > 0;
   app.innerHTML = `<div class="inicio">
+    <button class="btn bege chip-conta" id="bConta" aria-label="Conta: guardar o progresso na nuvem">${rotuloDoChip()}</button>
     <div class="fila-formigas">${[0, 2, 4, 1, 7].map((c, i) => `<span style="animation-delay:${i * 0.15}s">${formigaSvg(c)}</span>`).join('')}</div>
     <h1>Formigueiro</h1>
     <p class="sub">Mande as formigas buscarem o açúcar da cor delas.</p>
@@ -20,4 +22,5 @@ export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): voi
   app.querySelector('#bMapa')!.addEventListener('click', nav.mapa);
   app.querySelector('#bAjuda')!.addEventListener('click', nav.ajuda);
   app.querySelector('#bAjustes')!.addEventListener('click', nav.ajustes);
+  app.querySelector('#bConta')!.addEventListener('click', nav.conta);
 }

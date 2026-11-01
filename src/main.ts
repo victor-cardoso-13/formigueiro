@@ -9,6 +9,8 @@ import { montarInicio } from './ui/inicio.ts';
 import { montarAjustes } from './ui/ajustes.ts';
 import { montarMapa } from './ui/mapa.ts';
 import { esquecerTudoParaTeste, guardar, ganhou, liberada, progresso } from './ui/salvar.ts';
+import { iniciarNuvem, levarProgressoSemConta, progressoSemConta, sincronizar } from './nuvem/sincronia.ts';
+import { abrirConta, atualizarChip, janela, perguntar } from './ui/conta.ts';
 import { montarTutorial } from './ui/tutorial.ts';
 
 const fases = fasesJson as unknown as Fase[];
@@ -20,6 +22,9 @@ const fases = fasesJson as unknown as Fase[];
 const app = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);
 let limpar: (() => void) | null = null;
+/** Redesenha a tela atual (início, fases, ajustes) quando a conta muda; null durante a partida e o tutorial. */
+let redesenhar: (() => void) | null = null;
+let emJogo = false;
 
 // Só para os prints e testes (ver scripts/prints.mjs):
 //   ?limpo=1 começa do zero · ?visto=1 tutorial já visto · ?ganhas=N ganha as N primeiras · ?todas=1 libera tudo
@@ -50,16 +55,24 @@ function trocar(montar: () => (() => void) | void) {
 
 function inicio() {
   guardar({ tela: 'inicio' });
-  trocar(() => montarInicio(app, { jogar: () => void jogar(proximaFase()), mapa, ajuda: () => tutorial(inicio), ajustes }));
+  emJogo = false;
+  redesenhar = inicio;
+  trocar(() => montarInicio(app, { jogar: () => void jogar(proximaFase()), mapa, ajuda: () => tutorial(inicio), ajustes, conta: abrirConta }));
 }
 function ajustes() {
-  trocar(() => montarAjustes(app, inicio));
+  emJogo = false;
+  redesenhar = ajustes;
+  trocar(() => montarAjustes(app, inicio, abrirConta));
 }
 function mapa() {
   guardar({ tela: 'mapa' });
+  emJogo = false;
+  redesenhar = mapa;
   trocar(() => montarMapa(app, fases, { jogar: (id) => void jogar(id), inicio }));
 }
 function tutorial(depois: () => void) {
+  emJogo = false;
+  redesenhar = null;
   trocar(() =>
     montarTutorial(app, () => {
       guardar({ tutorialVisto: true });
@@ -97,6 +110,8 @@ async function jogar(id: number, demo?: string) {
   // a tela do jogo é a parte mais pesada: só é carregada quando alguém vai jogar
   const { montarJogo } = await import('./ui/tela-jogo.ts');
   const entrar = () => {
+    emJogo = true;
+    redesenhar = null;
     guardar({ tela: 'jogo', faseAtual: id });
     trocar(() =>
       montarJogo(
@@ -131,4 +146,35 @@ async function iniciar() {
   else if (tela === 'ajustes') ajustes();
   else inicio();
 }
-void iniciar();
+/** Conta e nuvem: o Firebase só é carregado se já havia conta neste aparelho ou quando alguém abre "Entrar". */
+function ligarNuvem() {
+  void iniciarNuvem({
+    trocouDeConta: () => {
+      if (emJogo) janela('A conta mudou', '<p>Voltando para a tela inicial.</p>', [{ rotulo: 'Ok', classe: 'verde', acao: inicio }]);
+      else redesenhar?.();
+    },
+    mudouSituacao: atualizarChip,
+    aoUsuario: async (u) => {
+      if (!u) return;
+      await sincronizar(progresso());
+      const sem = progressoSemConta();
+      const marca = `formigueiro:perguntou:${u.uid}`;
+      if (sem && !localStorage.getItem(marca)) {
+        localStorage.setItem(marca, '1');
+        perguntar(
+          'Juntar o progresso?',
+          'Você jogou sem conta neste aparelho. Quer juntar esse progresso à sua conta? (Se este aparelho não é seu, escolha "Não".)',
+          'Sim, juntar',
+          'Não',
+          () => {
+            levarProgressoSemConta(progresso());
+            if (!emJogo) redesenhar?.();
+          },
+        );
+      }
+      if (!emJogo) redesenhar?.();
+    },
+  });
+}
+
+void iniciar().then(ligarNuvem);
