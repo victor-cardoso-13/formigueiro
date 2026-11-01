@@ -1,12 +1,12 @@
-/** Mapa de fases: 4 grupos em abas (cada aba cabe sem rolagem). Fases trancadas até ganhar a anterior. */
+/** Mapa de fases: 4 grupos em abas (cada aba cabe sem rolagem). Níveis livres; dentro de cada nível, a fase só abre depois de ganhar a anterior. */
 import type { Fase, Grupo } from '../motor/tipos.ts';
 import { liberada, progresso } from './salvar.ts';
 
 const GRUPOS: { id: Grupo; nome: string; cor: string }[] = [
   { id: 'facil', nome: 'Fácil', cor: '#2f9e55' },
-  { id: 'media', nome: 'Média', cor: '#e7a400' },
+  { id: 'medio', nome: 'Médio', cor: '#e7a400' },
   { id: 'dificil', nome: 'Difícil', cor: '#d9342b' },
-  { id: 'muito-dificil', nome: 'Muito difícil', cor: '#8a4bb8' },
+  { id: 'desafio', nome: 'Desafio', cor: '#8a4bb8' },
 ];
 
 /** Cadeado branco (fase trancada) e selo com "certo" (fase ganha). */
@@ -15,10 +15,10 @@ const CERTO = '<span class="ok" aria-hidden="true"><svg viewBox="0 0 20 20"><pat
 
 export function montarMapa(app: HTMLElement, fases: Fase[], nav: { jogar(id: number): void; inicio(): void }, grupoInicial?: Grupo) {
   const ganhas = new Set(progresso().ganhas);
-  const atual = fases.find((f) => !ganhas.has(f.id) && liberada(f.id))?.id ?? progresso().faseAtual;
-  let grupo: Grupo = grupoInicial ?? fases.find((f) => f.id === atual)?.grupo ?? 'facil';
+  let grupo: Grupo = grupoInicial ?? fases.find((f) => f.id === progresso().faseAtual)?.grupo ?? 'facil';
   function desenhar() {
     const lista = fases.filter((f) => f.grupo === grupo);
+    const atual = lista.find((f) => !ganhas.has(f.id) && liberada(f, fases))?.id; // a próxima a jogar neste nível
     const total = lista.length;
     const feitas = lista.filter((f) => ganhas.has(f.id)).length;
     app.innerHTML = `<div class="mapa">
@@ -27,9 +27,9 @@ export function montarMapa(app: HTMLElement, fases: Fase[], nav: { jogar(id: num
       <p class="sub-aba">${feitas} de ${total} ganhas</p>
       <div class="grade-fases">${lista
         .map((f) => {
-          const ok = liberada(f.id);
+          const ok = liberada(f, fases);
           const ga = ganhas.has(f.id);
-          return `<button class="fase ${ga ? 'ganha' : ''} ${f.id === atual ? 'atual' : ''}" data-id="${f.id}" ${ok ? '' : 'disabled'} aria-label="Fase ${f.id}${ok ? '' : ', trancada'}">${ok ? `<span class="num">${f.id}</span>` : CADEADO}${ga ? CERTO : ''}</button>`;
+          return `<button class="fase ${ga ? 'ganha' : ''} ${f.id === atual ? 'atual' : ''}" data-id="${f.id}" ${ok ? '' : 'disabled'} aria-label="Fase ${f.numero}${ok ? '' : ', trancada'}">${ok ? `<span class="num">${f.numero}</span>` : CADEADO}${ga ? CERTO : ''}</button>`;
         })
         .join('')}${total === 0 ? '<p class="breve">Em breve</p>' : ''}</div>
     </div>`;

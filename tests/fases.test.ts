@@ -9,9 +9,9 @@ const fases: Fase[] = JSON.parse(readFileSync(new URL('../src/fases/fases.json',
 
 const GRUPOS: Record<Grupo, { ids: [number, number]; largura: [number, number]; cores: [number, number] }> = {
   facil: { ids: [1, 10], largura: [24, 36], cores: [3, 4] },
-  media: { ids: [11, 30], largura: [30, 40], cores: [4, 6] },
-  dificil: { ids: [31, 50], largura: [36, 48], cores: [6, 8] },
-  'muito-dificil': { ids: [51, 60], largura: [40, 48], cores: [8, 11] },
+  medio: { ids: [11, 20], largura: [30, 40], cores: [4, 6] },
+  dificil: { ids: [21, 40], largura: [36, 48], cores: [6, 8] },
+  desafio: { ids: [41, 70], largura: [30, 48], cores: [5, 11] },
 };
 
 describe('desenhos à mão', () => {
@@ -24,12 +24,12 @@ describe('desenhos à mão', () => {
   });
 });
 
-describe('as 60 fases congeladas', () => {
-  it('ids 1..60 e 10/20/20/10 por grupo', () => {
-    expect(fases.map((f) => f.id)).toEqual(Array.from({ length: 60 }, (_, i) => i + 1));
+describe('as 70 fases congeladas', () => {
+  it('ids 1..70 e 10/10/20/30 por nível', () => {
+    expect(fases.map((f) => f.id)).toEqual(Array.from({ length: 70 }, (_, i) => i + 1));
     const cont: Record<string, number> = {};
     for (const f of fases) cont[f.grupo] = (cont[f.grupo] ?? 0) + 1;
-    expect(cont).toEqual({ facil: 10, media: 20, dificil: 20, 'muito-dificil': 10 });
+    expect(cont).toEqual({ facil: 10, medio: 10, dificil: 20, desafio: 30 });
     for (const [g, c] of Object.entries(GRUPOS)) for (const f of fases) if (f.id >= c.ids[0] && f.id <= c.ids[1]) expect(f.grupo, `fase ${f.id}`).toBe(g);
   });
 
@@ -43,7 +43,7 @@ describe('as 60 fases congeladas', () => {
       expect(f.desenho.length).toBe(f.altura);
       for (const l of f.desenho) expect(l.length).toBe(f.largura);
       expect(f.altura).toBeGreaterThanOrEqual(18);
-      expect(f.altura).toBeLessThanOrEqual(40);
+      expect(f.altura).toBeLessThanOrEqual(46);
       const cores = new Set(f.desenho.join(''));
       expect(cores.has('.')).toBe(false); // quadro preenchido (tem cor de fundo)
       expect(cores.size).toBeLessThanOrEqual(PALETA.length);
@@ -91,7 +91,7 @@ describe('as 60 fases congeladas', () => {
         expect(new Set(cores).size).toBe(cores.length);
       }
       if (f.id <= 10) expect(grupos.size, 'fácil: sem canos').toBe(0);
-      if (f.id <= 30) for (const lugares of grupos.values()) expect(lugares.length, 'trios só a partir da fase 31').toBe(2);
+      if (f.id <= 20) for (const lugares of grupos.values()) expect(lugares.length, 'trios só a partir do nível difícil').toBe(2);
     });
 
     it('replay da solução vence', () => {

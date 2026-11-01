@@ -12,6 +12,11 @@ import { esquecerTudoParaTeste, guardar, ganhou, liberada, progresso } from './u
 import { montarTutorial } from './ui/tutorial.ts';
 
 const fases = fasesJson as unknown as Fase[];
+// número da fase dentro do nível (1, 2, 3…)
+{
+  const contagem: Record<string, number> = {};
+  for (const f of fases) f.numero = contagem[f.grupo] = (contagem[f.grupo] ?? 0) + 1;
+}
 const app = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);
 let limpar: (() => void) | null = null;
@@ -75,8 +80,16 @@ function tutorialPorCima() {
 }
 function proximaFase(): number {
   const p = progresso();
-  const f = fases.find((x) => !p.ganhas.includes(x.id) && liberada(x.id));
+  const atual = fases.find((x) => x.id === p.faseAtual);
+  // continua no nível em que a pessoa estava: a próxima ainda não ganha, na ordem
+  const f = fases.find((x) => x.grupo === (atual?.grupo ?? 'facil') && !p.ganhas.includes(x.id) && liberada(x, fases)) ?? fases.find((x) => !p.ganhas.includes(x.id) && liberada(x, fases));
   return f?.id ?? p.faseAtual;
+}
+/** A fase que vem depois de `id` no mesmo nível, se houver. */
+function proximaDoNivel(id: number): number | undefined {
+  const f = fases.find((x) => x.id === id);
+  const lista = fases.filter((x) => x.grupo === f?.grupo);
+  return lista[lista.findIndex((x) => x.id === id) + 1]?.id;
 }
 async function jogar(id: number, demo?: string) {
   const fase = emTeste && faseTeste ? faseTeste : fases.find((f) => f.id === id);
@@ -91,9 +104,9 @@ async function jogar(id: number, demo?: string) {
         fase,
         {
           irParaMapa: mapa,
-          irParaFase: (n) => (emTeste ? mapa() : void jogar(n)),
+          irParaFase: (n) => (emTeste ? mapa() : void jogar(proximaDoNivel(n) ?? n)),
           abrirTutorial: tutorialPorCima,
-          temProxima: (n) => !emTeste && fases.some((f) => f.id === n + 1),
+          temProxima: (n) => !emTeste && proximaDoNivel(n) !== undefined,
         },
         demo,
       ),

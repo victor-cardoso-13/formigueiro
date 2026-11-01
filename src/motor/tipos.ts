@@ -82,11 +82,13 @@ export interface NinhoFase {
   m?: true;
 }
 
-export type Grupo = 'facil' | 'media' | 'dificil' | 'muito-dificil';
+export type Grupo = 'facil' | 'medio' | 'dificil' | 'desafio';
 
 /** Fase congelada (fases.json). */
 export interface Fase {
   id: number;
+  /** número dentro do nível (1, 2, 3…): calculado na hora de carregar, não vem do JSON */
+  numero?: number;
   grupo: Grupo;
   nome: string;
   largura: number;

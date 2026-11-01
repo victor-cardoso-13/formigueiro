@@ -1,9 +1,9 @@
 /**
  * Guarda o progresso no próprio aparelho (localStorage). Sem conta, sem nuvem.
- * Se um dia as fases forem recriadas, troque o "v3" da chave.
+ * Se um dia as fases forem recriadas, troque o "v4" da chave.
  * (v1 era a versão antiga com trilha e fome; o jogo foi refeito e o progresso antigo não vale mais.)
  */
-const CHAVE = 'formigueiro:v3';
+const CHAVE = 'formigueiro:v4';
 
 export type Velocidade = 1 | 2 | 3;
 export type TelaSalva = 'inicio' | 'mapa' | 'jogo';
@@ -64,10 +64,15 @@ export function ganhou(id: number) {
   if (!p.ganhas.includes(id)) guardar({ ganhas: [...p.ganhas, id] });
 }
 
-/** A fase está liberada se é a 1ª, se já foi ganha ou se a anterior foi ganha. */
-export function liberada(id: number): boolean {
+/**
+ * Dentro de cada nível (fácil, médio, difícil, desafio) as fases abrem em ordem: a 1ª está sempre livre e a seguinte
+ * abre quando a anterior do MESMO nível é ganha. Os níveis em si são livres: dá para começar por qualquer um.
+ */
+export function liberada(f: { id: number; grupo: string }, todas: { id: number; grupo: string }[]): boolean {
   const g = progresso().ganhas;
-  return id === 1 || g.includes(id) || g.includes(id - 1);
+  const doNivel = todas.filter((x) => x.grupo === f.grupo);
+  const i = doNivel.findIndex((x) => x.id === f.id);
+  return i <= 0 || g.includes(f.id) || g.includes(doNivel[i - 1].id);
 }
 
 export function esquecerTudoParaTeste() {

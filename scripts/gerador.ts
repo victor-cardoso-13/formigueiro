@@ -61,9 +61,9 @@ export interface Entrada {
 /** Faixa-alvo da taxa do robô por grupo (aproximada). */
 export const FAIXA: Record<Grupo, [number, number]> = {
   facil: [0.7, 1],
-  media: [0.3, 0.7],
+  medio: [0.3, 0.7],
   dificil: [0.1, 0.35],
-  'muito-dificil': [0, 0.15],
+  desafio: [0, 0.15],
 };
 
 export const distanciaDaFaixa = (g: Grupo, taxa: number): number => {

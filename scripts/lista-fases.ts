@@ -1,4 +1,4 @@
-/** A lista das 60 fases: qual imagem, grupo e parâmetros do planejamento. */
+/** A lista das 70 fases (fácil 10, médio 10, difícil 20, desafio 30): qual imagem, grupo e parâmetros do planejamento. */
 import { DESENHOS_MEDIOS, DESENHOS_PEQUENOS, PRIMAS } from '../src/fases/desenhos.ts';
 import {
   aneis, ampliar, arlequim, comFundo, coresN, chevron, coresUsadas, espiral, ladrilhos, listras, molduras, retalhos, tartan, vitral, xadrez, zigzag,
@@ -95,34 +95,74 @@ function imagens(): Item[] {
     [58, 'Mandala IV', vitral(48, 40, coresN(10, 1), 58, true, 24)],
     [59, 'Coruja de retalhos', desenho(medio('Coruja'), 3, { retal: 3, semente: 59 })],
     [60, 'Redemoinho IV', espiral(48, 40, coresN(11), 6, 3)],
+    // ---- desafio extra (61–80): retalhos de desenhos, mandalas e padrões com muitas cores ----
+    [61, 'Estrela de retalhos', desenho(pequeno('Estrela'), 4, { retal: 2, semente: 61 })],
+    [62, 'Flor de retalhos', desenho(pequeno('Flor'), 4, { retal: 2, semente: 62 })],
+    [63, 'Árvore de retalhos', desenho(pequeno('Árvore'), 4, { retal: 2, semente: 63 })],
+    [64, 'Balão de retalhos', desenho(pequeno('Balão'), 4, { retal: 2, semente: 64 })],
+    [65, 'Abacaxi de retalhos', desenho(medio('Abacaxi'), 3, { retal: 3, semente: 65 })],
+    [66, 'Melancia de retalhos', desenho(medio('Melancia'), 3, { retal: 3, semente: 66 })],
+    [67, 'Joaninha de retalhos', desenho(medio('Joaninha'), 3, { retal: 3, semente: 67 })],
+    [68, 'Borboleta de retalhos', desenho(medio('Borboleta'), 3, { retal: 3, semente: 68 })],
+    [69, 'Sorvete de retalhos', desenho(medio('Sorvete'), 3, { retal: 3, semente: 69 })],
+    [70, 'Girassol de retalhos', desenho(medio('Girassol'), 3, { retal: 3, semente: 70 })],
+    [71, 'Mandala VI', vitral(48, 40, coresN(10, 2), 71, true, 24)],
+    [72, 'Mandala VII', vitral(44, 40, coresN(9, 5), 72, true, 20)],
+    [73, 'Redemoinho V', espiral(48, 40, coresN(10, 3), 5, 3)],
+    [74, 'Redemoinho VI', espiral(44, 40, coresN(9, 1), 6, 3)],
+    [75, 'Mosaico IV', vitral(48, 40, coresN(10, 4), 75, false, 20)],
+    [76, 'Círculos IV', aneis(44, 40, coresN(10, 2), 'circulo', 2)],
+    [77, 'Tijolinhos IV', ladrilhos(48, 40, coresN(10, 2), 77, 6, 3)],
+    [78, 'Alvo III', aneis(44, 36, coresN(9, 3), 'quadrado', 2)],
+    [79, 'Losangos III', aneis(48, 40, coresN(10, 4), 'losango', 2.5)],
+    [80, 'Molduras III', molduras(48, 36, coresN(9, 2), 2)],
   ];
 }
 
-export function grupoDe(id: number): Grupo {
-  return id <= 10 ? 'facil' : id <= 30 ? 'media' : id <= 50 ? 'dificil' : 'muito-dificil';
-}
+/**
+ * Os 4 níveis (como no Miaudoku). Cada nível lista as imagens ("id de imagem" = o número na lista acima) na ordem em que
+ * aparecem para o jogador; o id final da fase é 1, 2, 3… em sequência (fácil, médio, difícil, desafio).
+ */
+const NIVEIS: { grupo: Grupo; imagens: number[] }[] = [
+  { grupo: 'facil', imagens: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+  { grupo: 'medio', imagens: [11, 13, 15, 17, 19, 21, 23, 25, 27, 29] },
+  { grupo: 'dificil', imagens: [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50] },
+  {
+    grupo: 'desafio',
+    imagens: [51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80],
+  },
+];
 
-/** Parâmetros-base do planejamento por grupo (o gerador ajusta se a taxa do robô ficar fora da faixa). */
-export function parametrosDe(id: number): Parametros {
-  const g = grupoDe(id);
-  if (g === 'facil') return { tamMin: 15, tamMax: 40, pPar: 0, pTrio: 0, mistura: 0 };
-  if (g === 'media') return { tamMin: 10, tamMax: 40, pPar: 0.2, pTrio: 0, mistura: 0.2 };
-  if (g === 'dificil') return { tamMin: 6, tamMax: 45, pPar: 0.3, pTrio: id >= 31 ? 0.1 : 0, mistura: 0.4 };
+/** Parâmetros-base do planejamento por nível (o gerador ajusta se a taxa do robô ficar fora da faixa). */
+export function parametrosDe(grupo: Grupo, img: number): Parametros {
+  if (grupo === 'facil') return { tamMin: 15, tamMax: 40, pPar: 0, pTrio: 0, mistura: 0 };
+  if (grupo === 'medio') return { tamMin: 10, tamMax: 40, pPar: 0.2, pTrio: 0, mistura: 0.2 };
+  if (grupo === 'dificil') return { tamMin: 6, tamMax: 45, pPar: 0.3, pTrio: img >= 31 ? 0.1 : 0, mistura: 0.4 };
   return { tamMin: 6, tamMax: 50, pPar: 0.35, pTrio: 0.2, mistura: 0.7 };
 }
 
-/** Fases em que a 1ª semente não chegou na faixa: tenta outra. */
+/** Imagens em que a 1ª semente não chegou na faixa: tenta outra. */
 const OUTRA_SEMENTE: Record<number, number> = { 11: 5000, 13: 5000, 14: 2000, 16: 1000, 26: 5000, 29: 5000, 46: 1000, 50: 5000, 53: 5000 };
 
 export function entradas(): Entrada[] {
-  return imagens().map(([id, nome, linhas]) => ({
-    id,
-    grupo: grupoDe(id),
-    nome,
-    linhas,
-    colunas: id <= 20 ? 3 : 4,
-    semente: 1000 + id * 31 + (OUTRA_SEMENTE[id] ?? 0),
-    param: parametrosDe(id),
-    partidas: 60,
-  }));
+  const porImagem = new Map(imagens().map(([id, nome, linhas]) => [id, { nome, linhas }]));
+  const r: Entrada[] = [];
+  let id = 0;
+  for (const nivel of NIVEIS) {
+    for (const img of nivel.imagens) {
+      id++;
+      const { nome, linhas } = porImagem.get(img)!;
+      r.push({
+        id,
+        grupo: nivel.grupo,
+        nome,
+        linhas,
+        colunas: nivel.grupo === 'facil' || nivel.grupo === 'medio' ? 3 : 4,
+        semente: 1000 + img * 31 + (OUTRA_SEMENTE[img] ?? 0),
+        param: parametrosDe(nivel.grupo, img),
+        partidas: 60,
+      });
+    }
+  }
+  return r;
 }

@@ -3,7 +3,7 @@
 Quebra-cabeça de formigas e açúcar, feito para o Victor e a família (idosos primeiro). Slug `formigueiro`.
 **Esta pasta é só do Formigueiro.** Não mexa em outros jogos, no `_modelo/` nem no `APRENDIZADOS.md` daqui
 (anote sugestões no `PROMPT-PROXIMA-SESSAO.md`).
-**Ainda NÃO foi publicado**: repositório só local (sem GitHub, sem Pages). Sem Firebase: progresso só no `localStorage` (`formigueiro:v2`).
+**Ainda NÃO foi publicado**: repositório só local (sem GitHub, sem Pages). Sem Firebase: progresso só no `localStorage` (`formigueiro:v4`).
 
 ## Como falar com o usuário
 Português, linguagem simples, passo a passo (ele não programa). No fim, diga como testar no iPhone e no iPad.
@@ -16,7 +16,8 @@ Português, linguagem simples, passo a passo (ele não programa). No fim, diga c
   precisam de vagas livres para todos.
 - Quadro vazio = vitória. Vagas cheias de ninhos que não alcançam nada (e nada mais pode subir) = derrota.
 - Ajudas: Desfazer ilimitado, Recomeçar (com confirmação), velocidade 1×/2×/3×. Sem moedas/anúncios/poderes.
-- 60 fases **congeladas** em `src/fases/fases.json` (10 fácil / 20 média / 20 difícil / 10 muito difícil). Se regerar, troque a chave `formigueiro:v2`.
+- 70 fases **congeladas** em `src/fases/fases.json`, em 4 níveis livres para escolher (como no Miaudoku): Fácil 10, Médio 10, Difícil 20, Desafio 30. Dentro de cada nível a fase só abre depois de ganhar a anterior do mesmo nível (`liberada` em `salvar.ts`). Se regerar, troque a chave `formigueiro:v4`. Mais fases depois (meta: 50/50/200/200).
+- Canos: grupo de 2–3 ninhos, lado a lado na 1ª fileira ou empilhados na mesma coluna; só sobe com o grupo todo à vista; nas vagas ficam lado a lado até todos terminarem. Alguns ninhos de trás aparecem como "?" (`scripts/misterios.mjs`, rode depois de gerar).
 
 ## Decisão do Victor (1/nov)
 - **Mecânica igual à do Colony Flow, a pedido dele** (o jogo foi refeito por isso). **Sem torrão duro, sem zzz (dorminhoca), sem folha seca,

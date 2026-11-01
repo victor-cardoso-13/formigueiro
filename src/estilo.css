@@ -406,3 +406,7 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
   .ilus { min-height: 0; }
   .tutorial .texto-tut { font-size: 28px; max-width: 640px; }
 }
+
+/* nome do nível pequeno, acima de "Fase N" */
+.jogo .topo h2 { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.jogo .topo h2 .nivel { font-size: 0.42em; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; margin-bottom: 2px; opacity: 0.95; text-shadow: none; -webkit-text-stroke: 0.25em var(--tinta-escura); }

@@ -26,7 +26,7 @@ export interface Medidas {
   cel: number;
 }
 
-export const FOLGA = 0.065;
+export const FOLGA = 0.04;
 export const FOLGA_BAIXO = 0.02;
 /** Relação altura/largura da arena inteira (com folgas), para a tela calcular o tamanho. */
 export const razaoArena = (h: number): number => alturaArena(h) + FOLGA + FOLGA_BAIXO;

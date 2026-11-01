@@ -35,16 +35,15 @@ function ninho(x: number, y: number, s: number, cor: number, n: number | string,
   </g>`;
 }
 
-/** Cano como no jogo: haste fina e reta na cor do ninho de onde sai, com bolinhas nas pontas (desenhado por cima dos ninhos). */
-function cano(x1: number, y1: number, x2: number, y2: number, cor: number, larg = 6): string {
-  const esc = P(cor).escura;
-  const bola = (x: number, y: number) =>
-    `<circle cx="${x}" cy="${y}" r="${larg * 0.95}" fill="${P(cor).cor}" stroke="${esc}" stroke-width="2.5"/><circle cx="${x - larg * 0.25}" cy="${y - larg * 0.28}" r="${larg * 0.28}" fill="#fff" opacity=".55"/>`;
+/** Cano como no jogo: cápsula grossa, metade na cor de cada ninho, com brilho (entre dois ninhos). */
+function cano(x1: number, y1: number, x2: number, y2: number, corA: number, corB: number = corA, larg = 11): string {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const linha = (a: number, b: number, c: number, d: number, cor: string, l: number, op = 1) => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${cor}" stroke-width="${l}" stroke-opacity="${op}"/>`;
   return `<g stroke-linecap="round">
-    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${esc}" stroke-width="${larg + 4}"/>
-    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${P(cor).cor}" stroke-width="${larg}"/>
-    <line x1="${x1}" y1="${y1 - larg * 0.2}" x2="${x2}" y2="${y2 - larg * 0.2}" stroke="#fff" stroke-opacity=".5" stroke-width="${Math.max(1.5, larg * 0.28)}"/>
-    ${bola(x1, y1)}${bola(x2, y2)}</g>`;
+    ${linha(x1, y1, x2, y2, ESC, larg + 4, 0.85)}
+    ${linha(x1, y1, mx, my, P(corA).cor, larg)}${linha(mx, my, x2, y2, P(corB).cor, larg)}
+    ${linha(x1 - larg * 0.18, y1 - larg * 0.2, x2 - larg * 0.18, y2 - larg * 0.2, '#fff', Math.max(1.5, larg * 0.2), 0.5)}</g>`;
 }
 
 /** Formiga (olhando para cima), centrada em (cx,cy), com tamanho s e giro `ang` (graus). */
@@ -150,15 +149,15 @@ const ILUSTRACOES: string[] = [
   ),
   // 5: cano: o ninho ligado sobe junto, mesmo escondido atrás; ficam lado a lado nas vagas
   svg(
-    'Um ninho laranja da frente está ligado por um cano a outro ninho laranja escondido atrás; os dois sobem juntos e ficam lado a lado nas vagas',
+    'Dois ninhos ligados por um cano, um atrás do outro, sobem juntos e ficam lado a lado nas vagas',
     '0 0 240 262',
     `${[0, 3, 4].map((i) => vaga(VX(i), 32)).join('')}${vaga(VX(1), 32)}${vaga(VX(2), 32)}
      ${ninho(VX(1) - 19, 13, 38, 1, 3)}${ninho(VX(2) - 19, 13, 38, 1, 2)}
-     ${cano(VX(1), 13 + 38 * 0.88, VX(2), 13 + 38 * 0.88, 1, 4.5)}
+     ${cano(VX(1) + 17, 32, VX(2) - 17, 32, 1, 2)}
      ${seta('M96 150V82', '#7dea4a')}${seta('M86 93l10-11 10 11', '#7dea4a')}
      ${ninho(GX(0), 210, GS, 2, 2, true)}${ninho(GX(1), 210, GS, 1, 2, true)}${ninho(GX(2), 210, GS, 6, 3, true)}
      ${ninho(GX(0), 156, GS, 1, 3)}${ninho(GX(1), 156, GS, 4, 4)}${ninho(GX(2), 156, GS, 3, 2)}
-     ${cano(GX(0) + GS * 0.62, 156 + GS * 0.86, GX(1) + GS * 0.5, 210 + GS * 0.88, 1, 5)}`,
+     ${cano(GX(0) + GS / 2, 156 + GS * 0.97, GX(0) + GS / 2, 210 + GS * 0.03, 1, 1, 9)}`,
   ),
   // 6: ninho "?" se revela ao chegar na frente
   svg(
@@ -176,7 +175,7 @@ const PASSOS = [
   '<b>Toque</b> num ninho da frente. Ele sobe para uma <b>vaga</b> e as formigas saem.',
   'Cada formiga pega um quadradinho <b>da cor do ninho</b> que esteja na <b>borda</b> do desenho.',
   'Só há <b>5 vagas</b>. Ninho que não alcança nada <b>espera na vaga</b>. Se todas ficarem presas, você perde.',
-  'Ninhos ligados por <b>cano</b> sobem <b>juntos</b>, mesmo o escondido atrás. Ficam <b>lado a lado</b> nas vagas até todos terminarem.',
+  'Ninhos ligados por <b>cano</b> sobem <b>juntos</b>: lado a lado na frente, ou um atrás do outro. Ficam <b>lado a lado</b> nas vagas até todos terminarem.',
   'Ninho com <b>?</b> é surpresa: a cor aparece quando ele chega na <b>frente</b>.',
 ];
 

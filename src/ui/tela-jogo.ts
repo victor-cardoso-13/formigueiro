@@ -35,6 +35,7 @@ export interface Navegacao {
 type Vel = 1 | 2 | 3;
 /** 1× é metade do ritmo antigo; 2× é o antigo normal; 3× segue turbo. */
 const MULT_VEL: Record<Vel, number> = { 1: 0.5, 2: 1, 3: 3 };
+const NOME_NIVEL: Record<string, string> = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', desafio: 'Desafio' };
 const NOME_VEL: Record<Vel, string> = { 1: 'Lento', 2: 'Normal', 3: 'Turbo' };
 /** Marca "já viu o cartão do cano" em progresso().faixasVistas (não é número de fase). */
 const FAIXA_CANO = 9001;
@@ -116,7 +117,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   <div class="jogo" id="jogo">
     <div class="topo">
       <button class="btn roxo" id="bFases" aria-label="Voltar para as fases">${ICONE_FASES} Fases</button>
-      <h2 title="${fase.nome}">Fase ${fase.id}</h2>
+      <h2 title="${fase.nome}"><small class="nivel">${NOME_NIVEL[fase.grupo]}</small>Fase ${fase.numero ?? fase.id}</h2>
       <button class="btn vel" id="bVel" aria-label="Velocidade das formigas: toque para mudar"></button>
     </div>
     <div class="palco">
@@ -189,7 +190,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       W = Math.min(Wmax, (disp - alturaGrade(nh)) / raz);
       for (const n of cand) {
         const w = Math.min(Wmax, (disp - alturaGrade(n)) / raz);
-        if (w >= 0.72 * Wmax) {
+        if (w >= 0.97 * Wmax) {
           nh = n;
           W = w;
           break;
@@ -583,7 +584,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       mostrar(`<div class="cartao"><div class="festa">🎉</div><h2>Ganhou!</h2><p>Os quadradinhos acabaram.</p>
         <div class="acoes">${tem ? `<button class="btn grande ambar" id="cProxima">Próxima fase ›</button>` : ''}
         <button class="btn" id="cFases">Fases</button><button class="btn" id="cDeNovo">Jogar de novo</button></div></div>`);
-      cortina.querySelector('#cProxima')?.addEventListener('click', () => nav.irParaFase(fase.id + 1));
+      cortina.querySelector('#cProxima')?.addEventListener('click', () => nav.irParaFase(fase.id));
       cortina.querySelector('#cFases')!.addEventListener('click', () => nav.irParaMapa());
       cortina.querySelector('#cDeNovo')!.addEventListener('click', recomecar);
     } else {
@@ -660,7 +661,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   ajustar();
   if (demo && e.resultado !== 'jogando') agendarFim(true);
   else if (temCano && !demo && !progresso().faixasVistas.includes(FAIXA_CANO)) {
-    faixa.innerHTML = `<div class="cartao"><div class="festa">🔧</div><h2>Novidade!</h2><p class="faixa">Ninhos ligados por cano sobem juntos e precisam de vagas livres para todos.</p><button class="btn grande ambar" id="cEntendi">Entendi</button></div>`;
+    faixa.innerHTML = `<div class="cartao"><div class="festa">🔧</div><h2>Novidade!</h2><p class="faixa">Ninhos ligados por cano sobem juntos (lado a lado ou um atrás do outro) e precisam de vagas livres para todos.</p><button class="btn grande ambar" id="cEntendi">Entendi</button></div>`;
     faixa.hidden = false;
     faixa.querySelector('#cEntendi')!.addEventListener('click', () => {
       guardar({ faixasVistas: [...progresso().faixasVistas, FAIXA_CANO] });
