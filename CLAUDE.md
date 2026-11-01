@@ -17,8 +17,8 @@ Português, linguagem simples, passo a passo (ele não programa). No fim, diga c
   precisam de vagas livres para todos.
 - Quadro vazio = vitória. Vagas cheias de ninhos que não alcançam nada (e nada mais pode subir) = derrota.
 - Ajudas: Desfazer ilimitado, Recomeçar (com confirmação), velocidade 1×/2×/3×. Sem moedas/anúncios/poderes.
-- 70 fases **congeladas** em `src/fases/fases.json`, em 4 níveis livres para escolher (como no Miaudoku): Fácil 10, Médio 10, Difícil 20, Desafio 30. Dentro de cada nível a fase só abre depois de ganhar a anterior do mesmo nível (`liberada` em `salvar.ts`). Se regerar, troque a chave `formigueiro:v4`. Mais fases depois (meta: 50/50/200/200).
-- Canos: grupo de 2–3 ninhos, lado a lado na 1ª fileira ou empilhados na mesma coluna; só sobe com o grupo todo à vista; nas vagas ficam lado a lado até todos terminarem. Alguns ninhos de trás aparecem como "?" (`scripts/misterios.mjs`, rode depois de gerar).
+- 500 fases **congeladas** em `src/fases/fases.json`, em 4 níveis livres para escolher (como no Miaudoku): Fácil 50, Médio 50, Difícil 200, Desafio 200 (ids 1–70 = as primeiras, já publicadas e NUNCA mudam de id: o progresso salvo usa o id; ids 71–500 = extras no fim de cada nível, ordenadas da mais fácil para a mais difícil pela taxa do robô). Dentro de cada nível a fase só abre depois de ganhar a anterior do mesmo nível (`liberada` em `salvar.ts`). Se regerar, troque a chave `formigueiro:v4`.
+- Canos: grupo de 2–3 ninhos, lado a lado na 1ª fileira ou empilhados na mesma coluna; só sobe com o grupo todo à vista; nas vagas ficam lado a lado até todos terminarem. Fases extras: `FASES_EXTRA=1 node scripts/gerar.ts <a> <b>` / `bash scripts/gerar-extras.sh` (lista em `scripts/lista-extra.ts`, vai para `src/fases/fases-extra.json`, não versionado). Alguns ninhos de trás aparecem como "?" (`scripts/misterios.mjs`, rode depois de gerar).
 
 ## Decisão do Victor (1/nov)
 - **Mecânica igual à do Colony Flow, a pedido dele** (o jogo foi refeito por isso). **Sem torrão duro, sem zzz (dorminhoca), sem folha seca,

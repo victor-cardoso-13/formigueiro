@@ -36,6 +36,8 @@ export function montarMapa(app: HTMLElement, fases: Fase[], nav: { jogar(id: num
     app.querySelector('#bInicio')!.addEventListener('click', nav.inicio);
     for (const b of app.querySelectorAll<HTMLElement>('.aba')) b.addEventListener('click', () => ((grupo = b.dataset.g as Grupo), desenhar()));
     for (const b of app.querySelectorAll<HTMLElement>('.fase')) b.addEventListener('click', () => nav.jogar(Number(b.dataset.id)));
+    // com muitas fases no nível, já abre na próxima a jogar
+    app.querySelector('.fase.atual')?.scrollIntoView({ block: 'center' });
   }
   desenhar();
 }

@@ -6,8 +6,8 @@ import {
 import type { Grupo } from '../src/motor/tipos.ts';
 import type { Entrada, Parametros } from './gerador.ts';
 
-const pequeno = (nome: string) => DESENHOS_PEQUENOS.find((d) => d.nome === nome)!.linhas;
-const medio = (nome: string) => DESENHOS_MEDIOS.find((d) => d.nome === nome)!.linhas;
+export const pequeno = (nome: string) => DESENHOS_PEQUENOS.find((d) => d.nome === nome)!.linhas;
+export const medio = (nome: string) => DESENHOS_MEDIOS.find((d) => d.nome === nome)!.linhas;
 
 /** Fundos que podem aparecer atrás de um desenho (o 1º que não estiver no desenho). */
 const FUNDOS = ['c', 'b', 'p', 'g', 'k', 'o', 'y', 'm', 'w', 'd', 'r'];
@@ -18,7 +18,7 @@ function fundo(linhas: string[], preferido?: string): string {
 }
 
 /** Desenho à mão: fundo + borda de `pad` + ampliação `f`; `retal` = tamanho do bloco de retalhos (0 = sem). */
-function desenho(linhas: string[], f: number, opc: { pad?: number; fundo?: string; retal?: number; semente?: number; primas?: Record<string, string[]> } = {}): string[] {
+export function desenho(linhas: string[], f: number, opc: { pad?: number; fundo?: string; retal?: number; semente?: number; primas?: Record<string, string[]> } = {}): string[] {
   let l = linhas;
   if (opc.retal) l = retalhos(ampliar(l, f), opc.primas ?? PRIMAS, opc.retal, opc.semente ?? 1);
   else l = ampliar(l, f);
