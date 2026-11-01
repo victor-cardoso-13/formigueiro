@@ -149,3 +149,96 @@ export function recortar(linhas: string[], forma: 'circulo' | 'losango'): string
       .join(''),
   );
 }
+
+// ---------- ajudantes e padrões novos (quadros grandes, "Colony Flow") ----------
+
+/** Troca os lugares vazios ('.') pela cor de fundo `bg`; `pad` = quantas linhas/colunas de fundo acrescentar em volta. */
+export function comFundo(linhas: string[], bg: string, pad = 0): string[] {
+  const w = linhas[0].length + 2 * pad;
+  const miolo = linhas.map((l) => bg.repeat(pad) + l.replaceAll('.', bg) + bg.repeat(pad));
+  const borda = Array.from({ length: pad }, () => bg.repeat(w));
+  return [...borda, ...miolo, ...borda];
+}
+
+/** Letras de cor usadas num desenho (sem o '.'). */
+export const coresUsadas = (linhas: string[]): string[] => [...new Set(linhas.join('').replaceAll('.', ''))];
+
+/** Espelha na horizontal (inverte cada linha). */
+export const inverter = (linhas: string[]): string[] => linhas.map((l) => [...l].reverse().join(''));
+
+/** Ondas horizontais: faixas de cor que sobem e descem. */
+export function ondas(w: number, h: number, cores: string[], amplitude = 3, periodo = 12, faixa = 3): string[] {
+  return grade(w, h, (x, y) => {
+    const d = y + amplitude * Math.sin((x / periodo) * Math.PI * 2);
+    return cores[((Math.floor(d / faixa) % cores.length) + cores.length) % cores.length];
+  });
+}
+
+/** Setas (chevrons) apontando para cima. */
+export function chevron(w: number, h: number, cores: string[], faixa = 3): string[] {
+  const cx = (w - 1) / 2;
+  return grade(w, h, (x, y) => cores[Math.floor((Math.abs(x - cx) + y) / faixa) % cores.length]);
+}
+
+/** Zigue-zague. */
+export function zigzag(w: number, h: number, cores: string[], periodo = 8, faixa = 3): string[] {
+  return grade(w, h, (x, y) => {
+    const m = x % periodo;
+    const tri = m < periodo / 2 ? m : periodo - m;
+    return cores[Math.floor((y + tri) / faixa) % cores.length];
+  });
+}
+
+/** Raios de sol: setores de cor ao redor do centro (com um miolo de outra cor). */
+export function raios(w: number, h: number, cores: string[], setores = 8, miolo = 0): string[] {
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  return grade(w, h, (x, y) => {
+    const r = Math.hypot(x - cx, y - cy);
+    if (miolo > 0 && r < miolo) return cores[cores.length - 1];
+    const a = Math.atan2(y - cy, x - cx) / (Math.PI * 2) + 0.5;
+    return cores[Math.floor(a * setores) % Math.max(1, cores.length - (miolo > 0 ? 1 : 0))];
+  });
+}
+
+/** Xadrez de losangos (arlequim): o fundo alterna as 2 primeiras cores; os losangos usam as outras, uma por casa. */
+export function arlequim(w: number, h: number, cores: string[], p = 8): string[] {
+  const losangos = cores.length > 2 ? cores.slice(2) : cores;
+  return grade(w, h, (x, y) => {
+    const dx = Math.abs((x % p) - (p - 1) / 2);
+    const dy = Math.abs((y % p) - (p - 1) / 2);
+    const q = Math.floor(x / p) + Math.floor(y / p) * 2;
+    return dx + dy <= (p - 1) / 2 ? losangos[q % losangos.length] : cores[(Math.floor(x / p) + Math.floor(y / p)) % 2];
+  });
+}
+
+/** Xadrez escocês: faixas que se cruzam. `padrao` = lista de [corIndice, largura]. */
+export function tartan(w: number, h: number, cores: string[], padrao: [number, number][]): string[] {
+  const seq: number[] = [];
+  for (const [c, n] of padrao) for (let i = 0; i < n; i++) seq.push(c);
+  const p = seq.length;
+  return grade(w, h, (x, y) => {
+    const a = seq[x % p];
+    const b = seq[y % p];
+    return cores[a === b ? a : (a + b) % cores.length];
+  });
+}
+
+/** Quadros dentro de quadros (molduras) com um desenho de cor viva no meio. */
+export function molduras(w: number, h: number, cores: string[], faixa = 2): string[] {
+  return grade(w, h, (x, y) => {
+    const d = Math.min(x, y, w - 1 - x, h - 1 - y);
+    return cores[Math.floor(d / faixa) % cores.length];
+  });
+}
+
+/** Estrelinhas/pontos espalhados em um fundo (semente fixa); `fundo` é a 1ª cor. */
+export function confete(w: number, h: number, cores: string[], semente: number, densidade = 0.18): string[] {
+  const rng = mulberry32(semente);
+  return grade(w, h, () => (rng() < densidade ? cores[1 + Math.floor(rng() * (cores.length - 1))] : cores[0]));
+}
+
+/** Manchas (vitral) com dois tons por mancha: dá mais cores sem perder o desenho. Cantos arredondados em `circulo`. */
+export function medalhao(linhas: string[], bg: string, forma: 'circulo' | 'losango' = 'circulo'): string[] {
+  return comFundo(recortar(linhas, forma), bg);
+}

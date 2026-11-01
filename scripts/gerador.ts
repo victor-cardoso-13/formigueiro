@@ -1,11 +1,16 @@
 /**
- * Gerador de fases do Formigueiro (roda no Node 26 direto: `node scripts/gerar.ts`).
- * Ideia: a fase NASCE de uma solução. Joga-se de verdade (com o motor) uma formiga por vez, e a fome de cada
- * formiga é o que ela comeu. Depois as formigas são repartidas em colunas mantendo a ordem dentro de cada coluna.
+ * Gerador de fases do Formigueiro ("Colony Flow"). Roda no Node 26 direto: `node scripts/gerar.ts`.
+ *
+ * Ideia: a fase NASCE de uma solução, planejada com o MOTOR REAL.
+ *  1. Parte-se de um quadro cheio (a imagem). Escolhe-se uma "unidade" (1 ninho, ou 2–3 ninhos de cores diferentes ligados por cano)
+ *     cujas cores têm quadradinhos expostos agora; testa-se num clone (sobe nas vagas, roda até parar) e o tamanho de cada ninho
+ *     é reduzido ao que ele realmente entregou. O estado do clone vira o novo estado base. Repete até o quadro esvaziar.
+ *  2. As unidades, na ordem do planejamento, são arrumadas numa grade de C colunas (cada linha leva unidades consecutivas;
+ *     dentro da linha a ordem é embaralhada). A solução = a primeira peça de cada unidade, na ordem do planejamento.
+ *  3. O replay da solução no motor tem de vencer. Mede-se a dificuldade com um robô que joga ao acaso.
  */
-import { REGRAS } from '../src/motor/regras.ts';
-import { clonar, formigaEm, novoEstado, origemDe, passo, podeTocar, rodarAteParar, tocar, toqueDe } from '../src/motor/jogo.ts';
-import type { Celula, Especial, Estado, Fase, FormigaFase, Grupo, Origem } from '../src/motor/tipos.ts';
+import { clonar, frente, novoEstado, parado, passo, podeTocar, restantesDaCor, rodarAteParar, tocar, expostos } from '../src/motor/colonia.ts';
+import type { Estado, Fase, Grupo, Ninho, NinhoFase } from '../src/motor/tipos.ts';
 import { corDeLetra } from '../src/fases/paleta.ts';
 
 export function mulberry32(semente: number) {
@@ -30,387 +35,297 @@ function embaralhar<T>(rng: Rng, v: T[]): T[] {
 }
 
 export interface Parametros {
-  colunas: number;
-  fomeMin: number;
-  fomeMax: number;
-  /** chance de uma formiga nova ter fome a mais (vai para a espera e volta) */
-  pSobra: number;
-  /** tamanho máximo da sobra de fome */
-  sobraMax: number;
-  /** quantas formigas esperando ao mesmo tempo, no máximo, na solução */
-  maxEspera: number;
-  /** chance de reaproveitar uma formiga da espera quando ela já consegue terminar */
-  pReuso: number;
-  folhas: number; // fração das células
-  dorminhocas: number; // quantidade
-}
-
-export const PADRAO: Record<Grupo, Parametros> = {
-  facil: { colunas: 2, fomeMin: 4, fomeMax: 20, pSobra: 0, sobraMax: 3, maxEspera: 2, pReuso: 0.5, folhas: 0, dorminhocas: 0 },
-  media: { colunas: 3, fomeMin: 5, fomeMax: 30, pSobra: 0.15, sobraMax: 3, maxEspera: 3, pReuso: 0.4, folhas: 0.05, dorminhocas: 0 },
-  dificil: { colunas: 4, fomeMin: 5, fomeMax: 40, pSobra: 0.3, sobraMax: 3, maxEspera: 3, pReuso: 0.35, folhas: 0.06, dorminhocas: 2 },
-  'muito-dificil': { colunas: 5, fomeMin: 5, fomeMax: 50, pSobra: 0.4, sobraMax: 3, maxEspera: 4, pReuso: 0.3, folhas: 0.08, dorminhocas: 4 },
-};
-
-export const FAIXA: Record<Grupo, [number, number]> = {
-  facil: [0.6, 1],
-  media: [0.2, 0.6],
-  dificil: [0.05, 0.2],
-  'muito-dificil': [0, 0.05],
-};
-
-export function desenhoDeLinhas(linhas: string[]): (Celula | null)[][] {
-  return linhas.map((l) =>
-    [...l].map((ch) => (ch === '.' ? null : { cor: corDeLetra(ch) < 0 ? parseInt(ch, 36) : corDeLetra(ch), folha: false })),
-  );
-}
-
-/** Converte linhas com letras da paleta em linhas "congeladas" (cor em base 36). */
-export function congelar(linhas: string[]): string[] {
-  return linhas.map((l) => [...l].map((ch) => (ch === '.' ? '.' : corDeLetra(ch).toString(36))).join(''));
-}
-
-function estadoVazio(desenho: (Celula | null)[][]): Estado {
-  let pedacos = 0;
-  for (const l of desenho) for (const c of l) if (c) pedacos++;
-  return {
-    largura: desenho[0].length,
-    altura: desenho.length,
-    desenho,
-    colunas: [],
-    espera: Array.from({ length: REGRAS.LUGARES_ESPERA }, () => null),
-    trilha: [],
-    saidas: 0,
-    passo: 0,
-    pedacos,
-    resultado: 'jogando',
-  };
-}
-
-/** Simula uma volta de UMA formiga (cor, fome) num desenho copiado. */
-function volta(desenho: (Celula | null)[][], cor: number, fome: number) {
-  const copia = desenho.map((l) => l.map((c) => (c ? { ...c } : null)));
-  const f = { id: 1, cor, fome };
-  const e = estadoVazio(copia);
-  e.colunas = [[f]];
-  tocar(e, { coluna: 0 });
-  rodarAteParar(e);
-  return { comeu: fome - f.fome, desenho: e.desenho };
-}
-
-const somaMordidas = (desenho: (Celula | null)[][], cor: number) => {
-  let n = 0;
-  for (const l of desenho) for (const c of l) if (c && c.cor === cor) n++;
-  return n;
-};
-const contaPedacos = (desenho: (Celula | null)[][]) => desenho.reduce((s, l) => s + l.filter(Boolean).length, 0);
-
-interface FormigaPlano {
-  cor: number;
-  fome: number;
-}
-type Toque = { nova: number } | { reuso: number };
-
-/** Constrói a sequência de formigas e toques que esvazia o desenho. Retorna null se emperrar. */
-export function planejar(desenhoInicial: (Celula | null)[][], p: Parametros, rng: Rng) {
-  let desenho = desenhoInicial.map((l) => l.map((c) => (c ? { ...c } : null)));
-  const formigas: FormigaPlano[] = [];
-  const toques: Toque[] = [];
-  const pendentes: { idx: number; cor: number; resta: number }[] = [];
-  const cores = [...new Set(desenho.flat().filter(Boolean).map((c) => c!.cor))];
-  let guarda = 0;
-  while (contaPedacos(desenho) > 0) {
-    if (guarda++ > 5000) return null;
-    // 1) reaproveitar uma formiga da espera que já consegue terminar (obrigatório se ela é a última da cor)
-    let feito = false;
-    const ordem = embaralhar(rng, pendentes);
-    for (const pd of ordem) {
-      const obrigatorio = somaMordidas(desenho, pd.cor) === pd.resta || pendentes.length >= p.maxEspera;
-      if (!obrigatorio && rng() > p.pReuso) continue;
-      const r = volta(desenho, pd.cor, pd.resta);
-      if (r.comeu === pd.resta) {
-        desenho = r.desenho;
-        toques.push({ reuso: pd.idx });
-        pendentes.splice(pendentes.indexOf(pd), 1);
-        feito = true;
-        break;
-      }
-    }
-    if (feito) continue;
-    // 2) formiga nova
-    const reservado = (cor: number) => pendentes.filter((x) => x.cor === cor).reduce((s, x) => s + x.resta, 0);
-    const opcoes = cores
-      .map((cor) => {
-        const permitido = somaMordidas(desenho, cor) - reservado(cor);
-        if (permitido <= 0) return null;
-        const r = volta(desenho, cor, permitido);
-        return r.comeu > 0 ? { cor, pot: r.comeu } : null;
-      })
-      .filter((x): x is { cor: number; pot: number } => !!x);
-    if (opcoes.length === 0) {
-      if (pendentes.length === 0) return null; // emperrou (folhas que nunca caem)
-      // tenta qualquer pendente (mesmo não obrigatório)
-      let ok = false;
-      for (const pd of pendentes) {
-        const r = volta(desenho, pd.cor, pd.resta);
-        if (r.comeu === pd.resta) {
-          desenho = r.desenho;
-          toques.push({ reuso: pd.idx });
-          pendentes.splice(pendentes.indexOf(pd), 1);
-          ok = true;
-          break;
-        }
-      }
-      if (!ok) return null;
-      continue;
-    }
-    const boas = opcoes.filter((o) => o.pot >= Math.min(p.fomeMin, 3) + 1 && o.pot >= p.fomeMin);
-    const escolha = (boas.length ? boas : opcoes)[Math.floor(rng() * (boas.length ? boas.length : opcoes.length))];
-    const alvoFome = inteiro(rng, p.fomeMin, p.fomeMax);
-    let comer = Math.min(escolha.pot, alvoFome);
-    let fome = comer;
-    const idx = formigas.length;
-    if (pendentes.length < p.maxEspera && rng() < p.pSobra && comer >= 2 && escolha.pot <= alvoFome) {
-      // come tudo o que dá e ainda fica com fome: vai esperar
-      const sobra = inteiro(rng, 1, Math.max(1, p.sobraMax));
-      const restante = somaMordidas(desenho, escolha.cor) - reservado(escolha.cor) - comer;
-      if (restante >= sobra) {
-        fome = comer + sobra;
-        pendentes.push({ idx, cor: escolha.cor, resta: sobra });
-      }
-    }
-    const r = volta(desenho, escolha.cor, fome);
-    if (r.comeu !== comer) {
-      // inesperado (não deveria acontecer): desfaz o pendente e segue com o que comeu
-      comer = r.comeu;
-      if (fome !== comer && !pendentes.some((x) => x.idx === idx)) fome = comer;
-    }
-    desenho = r.desenho;
-    formigas.push({ cor: escolha.cor, fome });
-    toques.push({ nova: idx });
-  }
-  if (pendentes.length) return null;
-  return { formigas, toques };
-}
-
-/** Reparte as formigas novas nas colunas (mantendo a ordem) respeitando as dorminhocas. */
-export function repartir(formigas: FormigaPlano[], nColunas: number, dorminhocas: number, rng: Rng) {
-  const n = formigas.length;
-  // escolhe quem dorme: posições >= 4 na ordem, sem ser das últimas
-  const candidatas = embaralhar(rng, Array.from({ length: Math.max(0, n - 6) }, (_, i) => i + 4));
-  const dormem = new Set(candidatas.slice(0, dorminhocas));
-  const colunas: (FormigaFase & { i: number })[][] = Array.from({ length: nColunas }, () => []);
-  for (let i = 0; i < n; i++) {
-    let permitidas = colunas.map((_, c) => c);
-    if (dormem.has(i)) {
-      permitidas = permitidas.filter((c) => {
-        const col = colunas[c];
-        const ultimo = col.length ? col[col.length - 1].i : -1;
-        return col.length === 0 ? i >= 3 : ultimo <= i - 4;
-      });
-      if (permitidas.length === 0) dormem.delete(i);
-    }
-    if (permitidas.length === 0) permitidas = colunas.map((_, c) => c);
-    const menor = Math.min(...permitidas.map((c) => colunas[c].length));
-    const folgadas = permitidas.filter((c) => colunas[c].length <= menor + 1);
-    const c = folgadas[Math.floor(rng() * folgadas.length)];
-    const f: FormigaFase & { i: number } = { cor: formigas[i].cor, fome: formigas[i].fome, i };
-    if (dormem.has(i)) f.dorme = true;
-    colunas[c].push(f);
-  }
-  return colunas;
-}
-
-/** Joga a solução de verdade e devolve os toques (ou null se não vencer). */
-export function jogarSolucao(fase: Fase, toques: Toque[], indiceDeNova: Map<number, number>): number[] | null {
-  const e = novoEstado(fase);
-  const saida: number[] = [];
-  // id de cada formiga nova: o motor numera coluna por coluna, na ordem.
-  const idDe = new Map<number, number>();
-  let id = 1;
-  fase.colunas.forEach((col) => col.forEach((f) => idDe.set((f as FormigaFase & { i: number }).i, id++)));
-  void indiceDeNova;
-  for (const t of toques) {
-    let origem: Origem;
-    if ('nova' in t) {
-      const alvoId = idDe.get(t.nova)!;
-      const col = e.colunas.findIndex((c) => c[0]?.id === alvoId);
-      if (col < 0) return null;
-      origem = { coluna: col };
-    } else {
-      const alvoId = idDe.get(t.reuso)!;
-      const lugar = e.espera.findIndex((f) => f?.id === alvoId);
-      if (lugar < 0) return null;
-      origem = { espera: lugar };
-    }
-    if (!podeTocar(e, origem)) return null;
-    tocar(e, origem);
-    rodarAteParar(e);
-    saida.push(toqueDe(origem));
-    if (e.resultado !== 'jogando') break;
-  }
-  return e.resultado === 'vitoria' ? saida : null;
-}
-
-/** Partidas ao acaso entre os toques válidos. Retorna a fração que ganha. */
-export function taxaAleatoria(fase: Fase, partidas: number, semente: number): number {
-  const rng = mulberry32(semente);
-  const total = fase.colunas.reduce((s, c) => s + c.length, 0);
-  let ganhou = 0;
-  for (let k = 0; k < partidas; k++) {
-    const e = novoEstado(fase);
-    let toques = 0;
-    let passos = 0;
-    const maxToques = total * 6 + 40;
-    while (e.resultado === 'jogando' && passos < 200000) {
-      const validos: Origem[] = [];
-      for (let c = 0; c < e.colunas.length; c++) if (podeTocar(e, { coluna: c })) validos.push({ coluna: c });
-      for (let j = 0; j < e.espera.length; j++) if (podeTocar(e, { espera: j })) validos.push({ espera: j });
-      if (validos.length > 0 && (e.trilha.length === 0 || rng() < 0.5) && toques < maxToques) {
-        tocar(e, validos[Math.floor(rng() * validos.length)]);
-        toques++;
-      } else if (e.trilha.length > 0) {
-        passo(e);
-        passos++;
-      } else break; // nada a fazer
-    }
-    if (e.resultado === 'vitoria') ganhou++;
-  }
-  return ganhou / partidas;
+  /** tamanho dos ninhos (quadradinhos que cada um leva) */
+  tamMin: number;
+  tamMax: number;
+  /** chance de a unidade ser um par / um trio ligado por cano */
+  pPar: number;
+  pTrio: number;
+  /** 0..1: quanto o layout vira "pistas" (mais armadilhas na frente) */
+  mistura: number;
 }
 
 export interface Entrada {
   id: number;
   grupo: Grupo;
   nome: string;
-  linhas: string[]; // letras da paleta
+  /** desenho em letras da paleta (sem buracos) */
+  linhas: string[];
+  colunas: number;
   semente: number;
-  especiais?: { folha?: boolean; dorminhoca?: boolean };
-  faixa?: string;
-  /** substitui partes de PADRAO[grupo] */
-  param?: Partial<Parametros>;
-  partidas?: number;
-  /** dureza inicial (0..1) */
-  dureza?: number;
+  param: Parametros;
+  /** nº de partidas do robô */
+  partidas: number;
 }
 
-function sorteiaCelulas(desenho: (Celula | null)[][], fracao: number, rng: Rng, exclui = new Set<string>()): [number, number][] {
-  const todas: [number, number][] = [];
-  desenho.forEach((l, y) => l.forEach((c, x) => c && !exclui.has(`${x},${y}`) && todas.push([x, y])));
-  const n = Math.round(todas.length * fracao);
-  return embaralhar(rng, todas).slice(0, n);
+/** Faixa-alvo da taxa do robô por grupo (aproximada). */
+export const FAIXA: Record<Grupo, [number, number]> = {
+  facil: [0.7, 1],
+  media: [0.3, 0.7],
+  dificil: [0.1, 0.35],
+  'muito-dificil': [0, 0.15],
+};
+
+export const distanciaDaFaixa = (g: Grupo, taxa: number): number => {
+  const [a, b] = FAIXA[g];
+  return taxa < a ? a - taxa : taxa > b ? taxa - b : 0;
+};
+
+export interface Unidade {
+  ninhos: { cor: number; n: number }[];
 }
 
-/** Tenta montar UMA fase com os parâmetros dados. */
-export function montar(ent: Entrada, p: Parametros, tentativa: number): Fase | null {
-  const rng = mulberry32(ent.semente * 1009 + tentativa * 7919 + 13);
-  const base = desenhoDeLinhas(ent.linhas);
-  const esp = ent.especiais ?? {};
-  const folhas = esp.folha ? sorteiaCelulas(base, p.folhas, rng) : [];
-  for (const [x, y] of folhas) base[y][x]!.folha = true;
-  const plano = planejar(base, p, rng);
-  if (!plano) return null;
-  const nColunas = p.colunas;
-  const dormem = esp.dorminhoca ? p.dorminhocas : 0;
-  const colunasI = repartir(plano.formigas, nColunas, dormem, rng);
-  const especiais: Especial[] = [];
-  if (folhas.length) especiais.push('folha');
-  if (colunasI.some((c) => c.some((f) => f.dorme))) especiais.push('dorminhoca');
-  const fase: Fase = {
-    id: ent.id,
-    grupo: ent.grupo,
-    nome: ent.nome,
-    largura: ent.linhas[0].length,
-    altura: ent.linhas.length,
-    desenho: congelar(ent.linhas),
-    folhas,
-    colunas: colunasI as unknown as FormigaFase[][],
-    especiais,
-    solucao: [],
-    taxaAleatoria: 0,
-  };
-  if (ent.faixa) fase.faixa = ent.faixa;
-  const sol = jogarSolucao(fase, plano.toques, new Map());
-  if (!sol) return null;
-  fase.solucao = sol;
-  // tira o campo auxiliar "i"
-  fase.colunas = fase.colunas.map((c) => c.map((f) => {
-    const g: FormigaFase = { cor: f.cor, fome: f.fome };
-    if (f.dorme) g.dorme = true;
-    return g;
-  }));
-  return fase;
+const aBase36 = (linhas: string[]): string[] => linhas.map((l) => [...l].map((c) => (c === '.' ? '.' : corDeLetra(c).toString(36))).join(''));
+
+function faseVazia(e: Entrada): Fase {
+  const desenho = aBase36(e.linhas);
+  return { id: e.id, grupo: e.grupo, nome: e.nome, largura: desenho[0].length, altura: desenho.length, desenho, grade: [], solucao: [], taxaAleatoria: 0 };
+}
+
+// ---------- 1. planejamento com o motor real ----------
+
+/** Roda uma unidade (ninhos nas vagas 0.. em ordem) num clone. Retorna o clone e quanto cada ninho entregou. */
+function testarUnidade(base: Estado, cores: number[], ks: number[]): { e: Estado; entregues: number[] } {
+  const e = clonar(base);
+  e.resultado = 'jogando';
+  delete e.motivo;
+  const grupo = cores.length > 1 ? 1 : undefined;
+  const ninhos: Ninho[] = cores.map((cor, i) => {
+    const n: Ninho = { id: i + 1, cor, n: ks[i], restam: ks[i], espera: 0 };
+    if (grupo !== undefined) n.grupo = grupo;
+    return n;
+  });
+  // um ninho "enfeite" para o motor nunca dar derrota por falta de toque (não é tocado)
+  e.grade = [[...ninhos, { id: 99, cor: 0, n: 1, restam: 1, espera: 0 }]];
+  if (!tocar(e, 1)) throw new Error('toque inválido no planejamento');
+  rodarAteParar(e);
+  return { e, entregues: ninhos.map((n) => n.n - n.restam) };
+}
+
+/** Fecha uma unidade: reduz o tamanho ao entregue e confere até estabilizar. Retorna null se algum ninho ficou sem entregar nada. */
+function fecharUnidade(base: Estado, cores: number[], ks: number[]): { e: Estado; ks: number[] } | null {
+  let atual = [...ks];
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
+    const r = testarUnidade(base, cores, atual);
+    if (r.entregues.every((v, i) => v === atual[i])) {
+      r.e.grade = [];
+      r.e.vagas = r.e.vagas.map(() => null);
+      r.e.resultado = r.e.pedacos === 0 ? 'vitoria' : 'jogando';
+      return { e: r.e, ks: atual };
+    }
+    if (r.entregues.some((v) => v <= 0)) return null;
+    atual = r.entregues;
+  }
+  return null;
+}
+
+function planejar(desenho: string[], P: Parametros, rng: Rng): Unidade[] {
+  let base = novoEstado({ id: 0, grupo: 'facil', nome: '', largura: desenho[0].length, altura: desenho.length, desenho, grade: [], solucao: [], taxaAleatoria: 0 });
+  const unidades: Unidade[] = [];
+  let guarda = 0;
+  while (base.pedacos > 0 && guarda++ < 5000) {
+    const comExposto: number[] = [];
+    for (let c = 0; c < 11; c++) if (restantesDaCor(base, c) > 0 && expostos(base, c).length > 0) comExposto.push(c);
+    if (!comExposto.length) throw new Error('quadro sem quadradinho exposto');
+    const r = rng();
+    let s = r < P.pTrio ? 3 : r < P.pTrio + P.pPar ? 2 : 1;
+    s = Math.min(s, comExposto.length);
+    const tamanho = (cor: number) => {
+      const resta = restantesDaCor(base, cor);
+      let k = Math.min(inteiro(rng, P.tamMin, P.tamMax), resta);
+      if (resta - k < Math.ceil(P.tamMin / 2)) k = resta;
+      return k;
+    };
+    let fechada: { e: Estado; ks: number[]; cores: number[] } | null = null;
+    for (let t = 0; t < 3 && s > 1 && !fechada; t++) {
+      const cores = embaralhar(rng, comExposto).slice(0, s);
+      const f = fecharUnidade(base, cores, cores.map(tamanho));
+      if (f) fechada = { ...f, cores };
+    }
+    if (!fechada) {
+      const cor = comExposto[Math.floor(rng() * comExposto.length)];
+      const f = fecharUnidade(base, [cor], [tamanho(cor)]);
+      if (!f) continue;
+      fechada = { ...f, cores: [cor] };
+    }
+    const antes = base.pedacos;
+    base = fechada.e;
+    if (base.pedacos >= antes) throw new Error('unidade sem efeito');
+    unidades.push({ ninhos: fechada.cores.map((cor, i) => ({ cor, n: fechada!.ks[i] })) });
+  }
+  if (base.pedacos > 0) throw new Error('planejamento não terminou');
+  return unidades;
+}
+
+// ---------- 2. grade ----------
+
+/**
+ * Arruma as unidades na grade (colunas = pilhas). Cada unidade, na ordem do planejamento, vai para o fundo de uma(s) coluna(s):
+ * isso garante que a solução (ordem do planejamento) sempre tem o ninho na frente na hora de tocar.
+ * `mistura` = chance de um ninho avulso ir para a "pista" da sua posição no plano (colunas viram trechos do plano: os ninhos
+ * da frente ficam "do futuro", com a cor ainda escondida, e viram armadilhas); senão (e sempre para canos) vai para onde as
+ * pilhas estão mais baixas (linhas quase completas). Um grupo (cano) ocupa colunas vizinhas na mesma linha; colunas mais baixas
+ * ganham lugar vazio (null) até a linha dele. Cada coluna é limitada a uma altura "justa" para a grade ficar compacta.
+ */
+function montarGrade(unidades: Unidade[], colunas: number, mistura: number, rng: Rng): { grade: (NinhoFase | null)[][]; solucao: number[] } {
+  type Cel = { ninho: NinhoFase; unidade: Unidade } | null;
+  const pilhas: Cel[][] = Array.from({ length: colunas }, () => []);
+  let g = 0;
+  const total = unidades.length;
+  // altura "justa" de uma coluna: assim a grade final fica compacta (poucos lugares vazios)
+  const limite = Math.ceil(unidades.reduce((t, u) => t + u.ninhos.length, 0) / colunas) + 1;
+  const altura = (c: number) => pilhas[c].length;
+  unidades.forEach((u, i) => {
+    const s = u.ninhos.length;
+    const opcoes = colunas - s + 1;
+    // pista do plano (só para ninhos avulsos; canos vão para onde as pilhas estão mais baixas)
+    const pista = Math.min(colunas - 1, Math.floor(((i + rng()) / total) * colunas));
+    let c0 = -1;
+    if (s === 1 && rng() < mistura && altura(pista) < limite) c0 = pista;
+    if (c0 < 0) {
+      let melhor = Infinity;
+      const empates: number[] = [];
+      for (let c = 0; c < opcoes; c++) {
+        let alt = 0;
+        let lacuna = 0;
+        for (let k = 0; k < s; k++) alt = Math.max(alt, altura(c + k));
+        for (let k = 0; k < s; k++) lacuna += alt - altura(c + k);
+        const custo = alt * 100 + lacuna;
+        if (custo < melhor) {
+          melhor = custo;
+          empates.length = 0;
+        }
+        if (custo === melhor) empates.push(c);
+      }
+      c0 = empates[Math.floor(rng() * empates.length)];
+    }
+    let linha = 0;
+    for (let k = 0; k < s; k++) linha = Math.max(linha, pilhas[c0 + k].length);
+    const gid = s > 1 ? ++g : undefined;
+    u.ninhos.forEach((n, k) => {
+      const pilha = pilhas[c0 + k];
+      while (pilha.length < linha) pilha.push(null);
+      pilha.push({ ninho: gid === undefined ? { cor: n.cor, n: n.n } : { cor: n.cor, n: n.n, g: gid }, unidade: u });
+    });
+  });
+  const alturaFinal = Math.max(...pilhas.map((p) => p.length));
+  const linhas: Cel[][] = Array.from({ length: alturaFinal }, (_, l) => pilhas.map((p) => p[l] ?? null));
+  const primeiro = new Map<Unidade, number>();
+  let id = 0;
+  for (const row of linhas)
+    for (const c of row) if (c) {
+      id++;
+      if (!primeiro.has(c.unidade)) primeiro.set(c.unidade, id);
+    }
+  return { grade: linhas.map((r) => r.map((c) => c?.ninho ?? null)), solucao: unidades.map((u) => primeiro.get(u)!) };
+}
+
+// ---------- 3. conferir e medir ----------
+
+/** Refaz a solução no motor. */
+export function jogarSolucao(fase: Fase): boolean {
+  const e = novoEstado(fase);
+  for (const id of fase.solucao) {
+    if (!podeTocar(e, id)) return false;
+    tocar(e, id);
+    rodarAteParar(e);
+  }
+  return e.resultado === 'vitoria';
+}
+
+/** Uma partida de um robô que toca ao acaso (entre os toques válidos) e roda de 0 a 30 passos. */
+export function jogarAoAcaso(fase: Fase, rng: Rng): boolean {
+  const e = novoEstado(fase);
+  let guarda = 0;
+  while (e.resultado === 'jogando' && guarda++ < 10000) {
+    const vistos = new Set<string>();
+    const opcoes = frente(e).filter((n) => {
+      if (!podeTocar(e, n.id)) return false;
+      const chave = n.grupo === undefined ? `s${n.id}` : `g${n.grupo}`;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+    if (!opcoes.length) {
+      if (parado(e)) break;
+      rodarAteParar(e);
+      continue;
+    }
+    tocar(e, opcoes[Math.floor(rng() * opcoes.length)].id);
+    const passos = Math.floor(rng() * 31);
+    for (let i = 0; i < passos && e.resultado === 'jogando'; i++) passo(e);
+  }
+  return e.resultado === 'vitoria';
+}
+
+export function taxaAleatoria(fase: Fase, partidas: number, semente: number): number {
+  const rng = mulberry32(semente);
+  let ganhou = 0;
+  for (let i = 0; i < partidas; i++) if (jogarAoAcaso(fase, rng)) ganhou++;
+  return Math.round((ganhou / partidas) * 1000) / 1000;
 }
 
 export interface Resultado {
   fase: Fase;
-  tentativas: number;
   naFaixa: boolean;
-  param: Parametros;
+  tentativas: number;
 }
 
-/** Parâmetros para uma "dureza" d entre 0 (folgado) e 1 (apertado). */
-export function parametrosDe(grupo: Grupo, d: number, extra: Partial<Parametros> = {}): Parametros {
-  const base = PADRAO[grupo];
-  return {
-    ...base,
-    fomeMax: Math.round(base.fomeMax * (1 + d)),
-    pSobra: 0.95 * d,
-    sobraMax: 1 + Math.round(d * (grupo === 'facil' ? 2 : 10)),
-    maxEspera: d < 0.34 ? 2 : d < 0.67 ? 3 : 4,
-    pReuso: 0.5 - 0.42 * d,
-    ...extra,
-  };
+/** Arruma um plano numa fase (e confere a solução no motor). */
+export function montarFase(ent: Entrada, plano: Unidade[], mistura: number, semente: number): Fase {
+  const base = faseVazia(ent);
+  const { grade, solucao } = montarGrade(plano, ent.colunas, mistura, mulberry32(semente ^ 0x9e3779b9));
+  const fase: Fase = { ...base, grade, solucao };
+  if (!jogarSolucao(fase)) throw new Error(`solução não vence (fase ${ent.id})`);
+  return fase;
 }
 
-const DUREZA_INICIAL: Record<Grupo, number> = { facil: 0, media: 0.45, dificil: 0.75, 'muito-dificil': 0.9 };
-
-/** Gera a fase ajustando a dureza (bisseção) até a taxa de partidas ao acaso cair na faixa do grupo. */
-export function gerarFase(ent: Entrada, maxTentativas = 14): Resultado {
-  const [lo, hi] = FAIXA[ent.grupo];
-  const esp = ent.especiais ?? {};
-  const fixos: Partial<Parametros> = { ...ent.param };
-  if (!esp.folha) fixos.folhas = 0;
-  if (!esp.dorminhoca) fixos.dorminhocas = 0;
-  let melhor: Resultado | null = null;
-  let melhorDist = Infinity;
-  const partidas = ent.partidas ?? 300;
-  let minD = 0;
-  let maxD = 1;
-  let d = ent.dureza ?? DUREZA_INICIAL[ent.grupo];
-  let falhas = 0;
-  for (let t = 0; t < maxTentativas + falhas && t < maxTentativas * 3; t++) {
-    const p = parametrosDe(ent.grupo, d, fixos);
-    const fase = montar(ent, p, t);
-    if (!fase) {
-      falhas++;
-      d = Math.max(0, d - 0.05); // soluções muito apertadas às vezes emperram
+/**
+ * Para cada semente: planeja uma vez e procura (bisseção) a `mistura` do layout que deixa a taxa do robô dentro da faixa.
+ * Guarda a fase mais próxima da faixa.
+ */
+export function gerarFase(ent: Entrada, maxSementes = 4, avaliacoesPorSemente = 6): Resultado {
+  let melhor: { fase: Fase; d: number } | null = null;
+  let avaliacoes = 0;
+  const [, alvoMax] = FAIXA[ent.grupo];
+  let P = { ...ent.param };
+  for (let k = 0; k < maxSementes; k++) {
+    const semente = ent.semente + k * 7919;
+    let plano: Unidade[];
+    try {
+      plano = planejar(faseVazia(ent).desenho, P, mulberry32(semente));
+    } catch (err) {
+      console.log(`  (fase ${ent.id}: semente ${k} falhou: ${(err as Error).message})`);
       continue;
     }
-    const taxa = taxaAleatoria(fase, partidas, ent.semente + t);
-    fase.taxaAleatoria = Math.round(taxa * 1000) / 1000;
-    const dist = taxa < lo ? lo - taxa : taxa > hi ? taxa - hi : 0;
-    if (dist < melhorDist) {
-      melhorDist = dist;
-      melhor = { fase, tentativas: t + 1, naFaixa: dist === 0, param: { ...p } };
+    let lo = 0;
+    let hi = 1;
+    let m = P.mistura;
+    let ultima = 0;
+    for (let i = 0; i < avaliacoesPorSemente; i++) {
+      avaliacoes++;
+      const fase = montarFase(ent, plano, m, semente);
+      fase.taxaAleatoria = taxaAleatoria(fase, ent.partidas, semente ^ 0x5bd1e995);
+      const d = distanciaDaFaixa(ent.grupo, fase.taxaAleatoria);
+      if (!melhor || d < melhor.d) melhor = { fase, d };
+      if (d === 0) return { fase, naFaixa: true, tentativas: avaliacoes };
+      ultima = fase.taxaAleatoria > alvoMax ? 1 : -1;
+      if (ultima > 0) lo = m;
+      else hi = m;
+      if (hi - lo < 0.04) break;
+      m = (lo + hi) / 2;
     }
-    if (dist === 0) break;
-    if (taxa > hi) {
-      minD = d;
-      d = Math.min(1, (d + maxD) / 2 + (maxD - d < 0.02 ? 0 : 0));
-      if (maxD - minD < 0.03) maxD = Math.min(1, maxD + 0.1);
-    } else {
-      maxD = d;
-      d = Math.max(0, (d + minD) / 2);
-      if (maxD - minD < 0.03) minD = Math.max(0, minD - 0.1);
-    }
+    // nenhuma mistura serviu: muda o planejamento (ninhos menores e mais canos = mais difícil; o contrário = mais fácil)
+    const f = ultima > 0 ? 0.75 : 1.3;
+    P = {
+      ...P,
+      tamMin: Math.max(3, Math.round(P.tamMin * f)),
+      tamMax: Math.max(6, Math.min(70, Math.round(P.tamMax * (ultima > 0 ? 0.85 : 1.15)))),
+      pPar: ent.id >= 11 ? Math.min(0.6, Math.max(0, P.pPar + 0.1 * ultima)) : 0,
+      pTrio: ent.id >= 31 ? Math.min(0.4, Math.max(0, P.pTrio + 0.05 * ultima)) : 0,
+      mistura: ultima > 0 ? 0.8 : 0.1,
+    };
   }
-  if (!melhor) throw new Error(`Fase ${ent.id} (${ent.nome}): não consegui montar nenhuma solução`);
-  return melhor;
+  if (!melhor) throw new Error(`fase ${ent.id}: não foi possível gerar`);
+  return { fase: melhor.fase, naFaixa: melhor.d === 0, tentativas: avaliacoes };
 }
-
-// Usados só para evitar aviso de import não usado em alguns usos.
-export type { Fase };
-void clonar;
-void formigaEm;
-void origemDe;
