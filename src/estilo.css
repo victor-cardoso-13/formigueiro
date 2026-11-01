@@ -132,14 +132,22 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
   box-shadow: inset 0 5px 6px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.12);
 }
 .tampa {
-  position: absolute; z-index: 1; border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 35%, #a9adc8 0%, #9397b5 55%, #7c80a0 100%);
-  box-shadow: 0 5px 0 #50547e, inset 0 0 0 3px #7b7fa0, 0 8px 6px rgba(20, 20, 50, 0.25);
+  position: absolute; z-index: 2; border-radius: 50%;
+  background: linear-gradient(180deg, #d4d7ee 0%, #b3b7d6 50%, #9a9fc4 100%);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.7), inset 0 -3px 0 rgba(60, 64, 110, 0.25), 0 6px 0 #5d6196, 0 10px 8px rgba(15, 15, 45, 0.35);
 }
+/* miolo afundado da tampa */
+.tampa::before {
+  content: ''; position: absolute; inset: 14% 10% 16%; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #aab0d6 0%, #8d93bd 100%);
+  box-shadow: inset 0 3px 4px rgba(40, 44, 90, 0.45), 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+/* três frisos em relevo */
 .tampa::after {
-  content: ''; position: absolute; left: 36%; top: 36%; width: 28%; height: 26%;
-  background: repeating-linear-gradient(90deg, #686c8e 0 20%, transparent 20% 40%);
-  border-radius: 3px;
+  content: ''; position: absolute; left: 33%; top: 30%; width: 34%; height: 38%;
+  background: repeating-linear-gradient(90deg, #f1f2fb 0 17%, transparent 17% 41.5%);
+  border-radius: 6px;
+  filter: drop-shadow(0 2px 0 #62679a);
 }
 
 /* vagas: quadrados brancos arredondados em fila */
@@ -180,8 +188,11 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
 /* fileiras de trás: menores e esmaecidas (o número continua legível) */
 .ninho.atras { transform: scale(0.92); filter: saturate(0.7) brightness(0.86); box-shadow: 0 0 0 2px rgba(38, 35, 64, 0.6); border-color: rgba(255, 255, 255, 0.5); }
 .ninho.atras .n { opacity: 0.82; }
+.ninho.misterio { background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.28) 0 14%, transparent 15%), radial-gradient(circle at 72% 70%, rgba(255, 255, 255, 0.2) 0 10%, transparent 11%), linear-gradient(180deg, #a3a7c8, #858aae); border-style: dashed; }
+.ninho.misterio .n { opacity: 0.95; }
+.ninho.revelou { animation: revela 0.45s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes revela { 0% { transform: scale(0.7) rotate(-6deg); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
 .ninho.atras.d2 { transform: scale(0.86); filter: saturate(0.55) brightness(0.78); opacity: 0.85; }
-.ninho.atras.preso { transform: none; filter: saturate(0.8) brightness(0.92); }
 .mais {
   position: absolute; left: 0; right: 0; bottom: 0; height: 26px; display: flex; align-items: center; justify-content: center; gap: 10px; pointer-events: none;
 }
@@ -189,18 +200,6 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
   height: 24px; line-height: 24px; padding: 0 12px; white-space: nowrap;
   font-family: var(--titulo); font-weight: 700; font-size: 18px; color: #fff; background: #474b7a; border-radius: 12px;
 }
-/* fichinha do ninho que está ligado por cano mas ainda lá atrás */
-.mais .ficha-cano {
-  min-width: 44px; height: 26px; padding: 0 8px; display: grid; place-items: center; border-radius: 9px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 40%), var(--c);
-  border: 2px solid rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 1.5px var(--tinta-escura, #262340);
-  font-family: var(--titulo); font-weight: 700; font-size: 16px; line-height: 1;
-  color: #fff; -webkit-text-stroke: 0.2em var(--tinta-escura, #262340); paint-order: stroke fill;
-}
-.mostra-cano .cano .corpo { animation: pulsaCano 0.5s ease-in-out 3; }
-.mostra-cano .ficha-cano { animation: pulsaFicha 0.5s ease-in-out 3; }
-@keyframes pulsaCano { 50% { filter: brightness(1.7) saturate(1.3); } }
-@keyframes pulsaFicha { 50% { transform: scale(1.25); } }
 .mais:empty { display: none; }
 
 /* barra de baixo roxa com botões bege redondinhos (como a do Colony) */

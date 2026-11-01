@@ -225,7 +225,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     const bw = m.W * 0.22;
     buracoEl.style.cssText = `left:${px(m, bu.x) - bw / 2}px;top:${py(m, bu.y) - bw * 0.27}px;width:${bw}px;height:${bw * 0.54}px`;
     // tampa de bueiro (só enfeite), encostada à direita do buraco
-    tampaEl.style.cssText = `left:${px(m, bu.x) + bw * 0.22}px;top:${py(m, bu.y) - bw * 0.22}px;width:${bw * 0.78}px;height:${bw * 0.46}px`;
+    tampaEl.style.cssText = `left:${px(m, bu.x) + bw * 0.3}px;top:${py(m, bu.y) - bw * 0.2}px;width:${bw * 0.78}px;height:${bw * 0.46}px`;
     vagasEl.forEach((v, i) => {
       const c = centroVaga(m.h, i);
       v.style.cssText = `left:${px(m, c.x) - vs / 2}px;top:${py(m, c.y) - vs / 2}px;width:${vs}px;height:${vs}px`;
@@ -244,14 +244,21 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   }
 
   // ---------- grade de ninhos ----------
+  // ninhos misteriosos ("?" enquanto estão atrás): os ids seguem a ordem de leitura da grade, como em novoEstado
+  const misteriosos = new Set<number>();
+  {
+    let k = 1;
+    for (const linha of fase.grade) for (const n of linha) if (n) {
+      if (n.m) misteriosos.add(k);
+      k++;
+    }
+  }
+  const eramMisterio = new Set<number>();
   const SIMB = () => progresso().ajudas.simbolos;
-  /** Grupo de cano cujo parceiro escondido está sendo mostrado (depois de tocar num ninho bloqueado). */
-  let canoAtivo: number | null = null;
   function renderGrade() {
-    const frenteOk = new Set(frente(e).filter((n) => podeNaFrente(n.id)).map((n) => n.id));
     const colunas: Ninho[][] = [];
     for (let c = 0; c < nCol; c++) colunas.push(e.grade.map((l) => l[c]).filter((n): n is Ninho => !!n));
-    const pos = new Map<number, { x: number; y: number; vis: boolean; grupo?: number }>();
+    const pos = new Map<number, { x: number; y: number; vis: boolean; d: number; grupo?: number }>();
     let escondidos = 0;
     let html = '';
     colunas.forEach((col, c) =>
@@ -260,29 +267,32 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
         if (!vis) escondidos++;
         const x = c * (cw + CG);
         const y = d * (nh + RG);
-        pos.set(n.id, { x, y, vis, grupo: n.grupo });
-        const simb = SIMB() ? `<span class="simb">${simboloSvg(n.cor, PALETA[n.cor].cor, Math.round(nh * 0.3))}</span>` : '';
-        html += `<button class="ninho ${d === 0 && frenteOk.has(n.id) ? 'frente' : 'atras'}${d > 0 && d < R ? ' d' + d : ''}${d === 0 && !frenteOk.has(n.id) ? ' preso' : ''}" data-id="${n.id}" data-len="${String(n.restam).length}" ${vis ? '' : 'hidden'}
-          style="left:${x}px;top:${y}px;width:${cw}px;height:${nh}px;${estiloCor(n.cor)}"
-          aria-label="Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas">${simb}<span class="n">${n.restam}</span></button>`;
+        pos.set(n.id, { x, y, vis, d, grupo: n.grupo });
+        const mist = d > 0 && misteriosos.has(n.id);
+        if (mist) eramMisterio.add(n.id);
+        const revelou = !mist && eramMisterio.delete(n.id);
+        const simb = SIMB() && !mist ? `<span class="simb">${simboloSvg(n.cor, PALETA[n.cor].cor, Math.round(nh * 0.3))}</span>` : '';
+        html += `<button class="ninho ${d === 0 ? 'frente' : 'atras'}${d > 0 && d < R ? ' d' + d : ''}${mist ? ' misterio' : ''}${revelou ? ' revelou' : ''}" data-id="${n.id}" data-len="${mist ? 1 : String(n.restam).length}" ${vis ? '' : 'hidden'}
+          style="left:${x}px;top:${y}px;width:${cw}px;height:${nh}px;${mist ? '--c:#9296b8;--s:#6c7094;--tc:#fff;--ts:#262340' : estiloCor(n.cor)}"
+          aria-label="${mist ? 'Ninho misterioso' : `Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas`}">${simb}<span class="n">${mist ? '?' : n.restam}</span></button>`;
       }),
     );
     // Canos (como no Colony): passam por trás dos ninhos, no meio da altura, e só aparecem na fresta entre eles.
     // Se o ninho ligado ainda está lá atrás (escondido), o cano desce até uma fichinha embaixo que mostra qual é.
-    const porGrupo = new Map<number, { x: number; y: number; vis: boolean; cor: number; n: number }[]>();
+    const porGrupo = new Map<number, { x: number; y: number; vis: boolean; cor: number; d: number }[]>();
     colunas.forEach((col) =>
       col.forEach((n) => {
         const p = pos.get(n.id)!;
-        if (n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh / 2, vis: p.vis, cor: n.cor, n: n.restam }]);
+        if (n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh / 2, vis: p.vis, cor: n.cor, d: p.d }]);
       }),
     );
     const larguraTotal = nCol * cw + (nCol - 1) * CG;
     const alturaGrade = R * nh + (R - 1) * RG;
     const larg = Math.max(6, Math.round(nh * 0.14));
     const trechos: Trecho[] = [];
-    const fichas: { cor: number; n: number; de: { x: number; y: number; cor: number } }[] = [];
+    let misterios = '';
     const cor = (k: number) => PALETA[k].cor;
-    for (const [g, membros] of porGrupo) {
+    for (const membros of porGrupo.values()) {
       const vis = membros.filter((q) => q.vis).sort((a, b) => a.x - b.x);
       const escondidosDoGrupo = membros.filter((q) => !q.vis);
       for (let i = 1; i < vis.length; i++) {
@@ -298,28 +308,21 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
         }
         trechos.push({ d, cor: cor(a.cor), de: { x: a.x, y: ya }, ate: { x: b.x, y: yb } });
       }
-      if (vis.length && escondidosDoGrupo.length && g === canoAtivo) {
-        const de = vis[vis.length - 1];
-        for (const h of escondidosDoGrupo) fichas.push({ cor: h.cor, n: h.n, de });
+      // ligado escondido atrás: a haste desce pelo corredor até uma bolinha "?" (ele vem junto quando o da frente sobe)
+      const daFrente = vis.filter((q) => q.d === 0);
+      if (daFrente.length && escondidosDoGrupo.length) {
+        const de = daFrente[daFrente.length - 1];
+        const dir = de.x + cw / 2 + CG / 2 <= larguraTotal;
+        const gx = dir ? de.x + cw / 2 + CG / 2 : de.x - cw / 2 - CG / 2;
+        const y0 = de.y + nh * 0.36;
+        const yf = alturaGrade + larg * 1.3;
+        trechos.push({ d: `M${de.x} ${y0}H${gx}V${yf}`, cor: cor(de.cor), de: { x: de.x, y: y0 }, ate: { x: gx, y: yf } });
+        misterios += `<text x="${gx}" y="${yf + larg * 0.38}" text-anchor="middle" font-size="${larg * 1.1}" font-weight="800" fill="#262340" font-family="Fredoka, sans-serif">?</text>`;
       }
     }
-    const fichasHtml = fichas.map((f, i) => `<span class="ficha-cano" data-i="${i}" style="${estiloCor(f.cor)}">${f.n}</span>`).join('');
     grade.innerHTML = html;
-    mais.innerHTML = `${fichasHtml}${escondidos > 0 ? `<span class="pilula">+${escondidos} atrás</span>` : ''}`;
-    // cano das fichas: desce pelo corredor ao lado e vai até a fichinha
-    const gr = grade.getBoundingClientRect();
-    fichas.forEach((f, i) => {
-      const el = mais.querySelector<HTMLElement>(`.ficha-cano[data-i="${i}"]`);
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const fx = r.left + r.width / 2 - gr.left;
-      const fy = r.top + r.height / 2 - gr.top;
-      const dir = f.de.x + cw / 2 + CG / 2 <= larguraTotal;
-      const gx = dir ? f.de.x + cw / 2 + CG / 2 : f.de.x - cw / 2 - CG / 2;
-      const y0 = f.de.y + nh * 0.36;
-      trechos.push({ d: `M${f.de.x} ${y0}H${gx}V${fy}H${fx}`, cor: cor(f.de.cor), de: { x: f.de.x, y: y0 }, ate: { x: fx, y: fy } });
-    });
-    const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}</svg>` : '';
+    mais.innerHTML = escondidos > 0 ? `<span class="pilula">+${escondidos} atrás</span>` : '';
+    const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}${misterios}</svg>` : '';
     grade.insertAdjacentHTML('afterbegin', svg);
   }
 
@@ -424,12 +427,6 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   };
   window.addEventListener('formigueiro:pausa', pausar);
   window.addEventListener('formigueiro:retomar', retomar);
-  /** O ninho está na frente E os ligados a ele por cano também. */
-  function podeNaFrente(id: number): boolean {
-    const un = unidade(e, id) ?? [];
-    const fr = new Set(frente(e).map((n) => n.id));
-    return un.every((n) => fr.has(n.id));
-  }
   function ativo(): boolean {
     return !pausado && e.resultado === 'jogando' && cortina.hidden === true && faixa.hidden === true;
   }
@@ -502,21 +499,6 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     jogoEl.appendChild(el);
     avisoTimer = window.setTimeout(() => el.remove(), 2200);
   }
-  /** Faz o(s) cano(s) e as fichinhas pulsarem um pouco, para ver com quem o ninho está ligado. */
-  let canoTimer = 0;
-  function mostrarCano(grupo: number) {
-    canoAtivo = grupo;
-    renderGrade();
-    zonaGrade.classList.remove('mostra-cano');
-    void zonaGrade.offsetWidth;
-    zonaGrade.classList.add('mostra-cano');
-    window.clearTimeout(canoTimer);
-    canoTimer = window.setTimeout(() => {
-      zonaGrade.classList.remove('mostra-cano');
-      canoAtivo = null;
-      renderGrade();
-    }, 2600);
-  }
   function tremer(ids: number[]) {
     for (const id of ids) {
       const b = grade.querySelector<HTMLElement>(`.ninho[data-id="${id}"]`);
@@ -538,8 +520,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     if (motivo === 'atras') {
       const un = unidade(e, id) ?? [];
       tremer(un.map((n) => n.id));
-      if (un.length > 1 && un[0].grupo !== undefined) mostrarCano(un[0].grupo);
-      return aviso(un.length > 1 ? 'Os dois ninhos do cano precisam estar na frente' : 'Use os ninhos da frente');
+      return aviso('Use os ninhos da frente');
     }
     if (motivo) return;
     const de = new Map<number, DOMRect>();
@@ -563,7 +544,9 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
         () => undefined,
       );
     }
-    for (const ev of evs) if (ev.tipo === 'subiu') criarNinhoVaga(ev.vaga, e.vagas[ev.vaga]!, de.get(ev.id));
+    const g0 = grade.getBoundingClientRect();
+    const doFundo = new DOMRect(g0.left + g0.width / 2 - 20, g0.bottom, 40, 30);
+    for (const ev of evs) if (ev.tipo === 'subiu') criarNinhoVaga(ev.vaga, e.vagas[ev.vaga]!, de.get(ev.id) ?? doFundo);
     renderGrade();
     atualizarBotoes();
     verificar = true;

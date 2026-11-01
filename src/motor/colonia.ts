@@ -3,8 +3,8 @@
  * As funções MEXEM no estado recebido; use `clonar` antes de guardar um "antes" (Desfazer).
  *
  * Regras:
- * - Toque num ninho da FRENTE de uma coluna: ele sobe para uma vaga livre (ninhos ligados por cano sobem juntos
- *   e precisam de vagas livres para todos).
+ * - Toque num ninho da FRENTE de uma coluna: ele sobe para uma vaga livre (os ligados por cano sobem junto, mesmo
+ *   escondidos atrás, e precisam de vagas livres para todos).
  * - Cada ninho ativo solta formigas em leva: até 10 indo comer ao mesmo tempo, e a próxima sai quando uma pega o quadradinho. A formiga sai do buraco e escolhe o quadradinho EXPOSTO da
  *   cor do ninho mais perto (exposto = encosta, de lado, em cima ou embaixo, num espaço vazio que se liga ao lado de fora
  *   do quadro, como no Colony Flow), anda até ele pelos espaços vazios, pega e leva ao buraco. Cada quadradinho só é escolhido
@@ -78,13 +78,18 @@ export function lugarDe(e: Estado, id: number): { linha: number; coluna: number 
   return null;
 }
 
-/** O ninho tocado e os ligados a ele por cano (da esquerda para a direita), ou null se não está na grade. */
+/**
+ * O ninho tocado e os ligados a ele por cano (da esquerda para a direita), ou null se não está na grade.
+ * Como no Colony Flow, o ligado vem junto MESMO escondido atrás: basta o tocado estar na frente.
+ */
 export function unidade(e: Estado, id: number): Ninho[] | null {
   const lugar = lugarDe(e, id);
   if (!lugar) return null;
   const n = e.grade[lugar.linha][lugar.coluna]!;
   if (n.grupo === undefined) return [n];
-  return e.grade[lugar.linha].filter((x): x is Ninho => !!x && x.grupo === n.grupo);
+  const membros: { n: Ninho; linha: number; coluna: number }[] = [];
+  e.grade.forEach((linha, l) => linha.forEach((x, c) => x && x.grupo === n.grupo && membros.push({ n: x, linha: l, coluna: c })));
+  return membros.sort((a, b) => a.coluna - b.coluna || a.linha - b.linha).map((m) => m.n);
 }
 
 export const vagasLivres = (e: Estado): number => e.vagas.filter((v) => !v).length;
@@ -94,8 +99,7 @@ export function motivoDeNaoPoder(e: Estado, id: number): 'fim' | 'atras' | 'vaga
   if (e.resultado !== 'jogando') return 'fim';
   const un = unidade(e, id);
   if (!un) return 'atras';
-  const fr = new Set(frente(e).map((n) => n.id));
-  if (!un.every((n) => fr.has(n.id))) return 'atras';
+  if (!frente(e).some((n) => n.id === id)) return 'atras'; // só o tocado precisa estar na frente
   if (vagasLivres(e) < un.length) return 'vagas';
   return null;
 }

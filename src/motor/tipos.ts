@@ -78,6 +78,8 @@ export interface NinhoFase {
   n: number;
   /** ninhos com o mesmo `g` (na mesma linha, lado a lado) estão ligados por cano */
   g?: number;
+  /** ninho misterioso: aparece como "?" enquanto está atrás e se revela ao chegar na frente (só visual) */
+  m?: true;
 }
 
 export type Grupo = 'facil' | 'media' | 'dificil' | 'muito-dificil';

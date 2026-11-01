@@ -177,6 +177,13 @@ describe('formigas', () => {
     expect(lugares.length).toBe(2);
     expect(lugares[1] - lugares[0]).toBe(1);
   });
+  it('o ninho ligado por cano vem junto mesmo escondido atrás (basta o tocado estar na frente)', () => {
+    const e = novoEstado(fase(['0000'], [[{ cor: 0, n: 1, g: 1 }, { cor: 0, n: 1 }], [{ cor: 0, n: 1 }, { cor: 0, n: 1, g: 1 }]]));
+    // ninho 1 (frente, coluna 0) e ninho 4 (atrás, coluna 1) estão ligados
+    expect(podeTocar(e, 1)).toBe(true);
+    tocar(e, 1);
+    expect(e.vagas.filter(Boolean).map((v) => v!.id).sort()).toEqual([1, 4]);
+  });
   it('cada quadradinho só é escolhido por uma formiga', () => {
     const e = novoEstado(fase(['00', '00'], [[{ cor: 0, n: 4 }]]));
     tocar(e, 1);
