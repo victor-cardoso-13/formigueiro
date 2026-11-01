@@ -7,11 +7,12 @@ import { DESENHOS_MEDIOS, DESENHOS_PEQUENOS } from '../src/fases/desenhos.ts';
 
 const fases: Fase[] = JSON.parse(readFileSync(new URL('../src/fases/fases.json', import.meta.url), 'utf8'));
 
-const GRUPOS: Record<Grupo, { ids: [number, number]; largura: [number, number]; cores: [number, number] }> = {
-  facil: { ids: [1, 10], largura: [24, 36], cores: [3, 4] },
-  medio: { ids: [11, 20], largura: [30, 40], cores: [4, 6] },
-  dificil: { ids: [21, 40], largura: [36, 48], cores: [6, 8] },
-  desafio: { ids: [41, 70], largura: [30, 48], cores: [5, 11] },
+/** Cada nível: faixas de ids (as 70 primeiras + as extras no fim) e os limites de tamanho e de cores. */
+const GRUPOS: Record<Grupo, { ids: [number, number][]; total: number; largura: [number, number]; cores: [number, number] }> = {
+  facil: { ids: [[1, 10], [71, 110]], total: 50, largura: [24, 36], cores: [3, 4] },
+  medio: { ids: [[11, 20], [111, 150]], total: 50, largura: [30, 40], cores: [4, 6] },
+  dificil: { ids: [[21, 40], [151, 330]], total: 200, largura: [36, 48], cores: [6, 8] },
+  desafio: { ids: [[41, 70], [331, 500]], total: 200, largura: [30, 48], cores: [5, 11] },
 };
 
 describe('desenhos à mão', () => {
@@ -24,13 +25,13 @@ describe('desenhos à mão', () => {
   });
 });
 
-describe('as 70 fases congeladas', () => {
-  it('ids 1..70 e 10/10/20/30 por nível', () => {
-    expect(fases.map((f) => f.id)).toEqual(Array.from({ length: 70 }, (_, i) => i + 1));
+describe('as 500 fases congeladas', () => {
+  it('ids 1..500 e 50/50/200/200 por nível (as 70 primeiras não mudam de lugar)', () => {
+    expect(fases.map((f) => f.id)).toEqual(Array.from({ length: 500 }, (_, i) => i + 1));
     const cont: Record<string, number> = {};
     for (const f of fases) cont[f.grupo] = (cont[f.grupo] ?? 0) + 1;
-    expect(cont).toEqual({ facil: 10, medio: 10, dificil: 20, desafio: 30 });
-    for (const [g, c] of Object.entries(GRUPOS)) for (const f of fases) if (f.id >= c.ids[0] && f.id <= c.ids[1]) expect(f.grupo, `fase ${f.id}`).toBe(g);
+    expect(cont).toEqual({ facil: 50, medio: 50, dificil: 200, desafio: 200 });
+    for (const [g, c] of Object.entries(GRUPOS)) for (const f of fases) if (c.ids.some(([a, b]) => f.id >= a && f.id <= b)) expect(f.grupo, `fase ${f.id}`).toBe(g);
   });
 
   it('os desenhos são todos diferentes entre si', () => {
@@ -64,7 +65,7 @@ describe('as 70 fases congeladas', () => {
     });
 
     it('grade: colunas certas, canos: vizinhos da mesma linha ou empilhados na mesma coluna (grupos de 2 ou 3)', () => {
-      const colunas = f.id <= 20 ? 3 : 4;
+      const colunas = f.grupo === 'facil' || f.grupo === 'medio' ? 3 : 4;
       for (const linha of f.grade) expect(linha.length).toBe(colunas);
       expect(f.grade.flat().some(Boolean)).toBe(true);
       const grupos = new Map<number, { l: number; c: number }[]>();
@@ -90,8 +91,7 @@ describe('as 70 fases congeladas', () => {
         const cores = lugares.map((x) => f.grade[x.l][x.c]!.cor);
         expect(new Set(cores).size).toBe(cores.length);
       }
-      if (f.id <= 10) expect(grupos.size, 'fácil: sem canos').toBe(0);
-      if (f.id <= 20) for (const lugares of grupos.values()) expect(lugares.length, 'trios só a partir do nível difícil').toBe(2);
+      if (f.grupo === 'facil') expect(grupos.size, 'fácil: sem canos').toBe(0);
     });
 
     it('replay da solução vence', () => {

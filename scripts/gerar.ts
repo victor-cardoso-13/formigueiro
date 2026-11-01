@@ -7,10 +7,14 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmdirSync } from 'node:fs';
 import { FAIXA, distanciaDaFaixa, gerarFase, taxaAleatoria } from './gerador.ts';
-import { entradas } from './lista-fases.ts';
+import { entradas as entradasBase } from './lista-fases.ts';
+import { entradasExtra } from './lista-extra.ts';
 import type { Fase } from '../src/motor/tipos.ts';
 
-const arquivo = new URL('../src/fases/fases.json', import.meta.url);
+// FASES_EXTRA=1: gera as fases extra (ids 71…) em src/fases/fases-extra.json, sem mexer no fases.json que está no jogo
+const extra = !!process.env.FASES_EXTRA;
+const entradas = extra ? entradasExtra : entradasBase;
+const arquivo = new URL(extra ? '../src/fases/fases-extra.json' : '../src/fases/fases.json', import.meta.url);
 
 /** Grava no fases.json (com trava, porque vários processos podem gravar ao mesmo tempo). */
 function gravar(f: Fase) {
