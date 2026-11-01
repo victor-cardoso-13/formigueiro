@@ -108,12 +108,6 @@ function pintarCelula(ctx: CanvasRenderingContext2D, m: Medidas, dpr: number, x:
   ctx.fillStyle = PALETA[cor].cor;
   rr(ctx, r.x + g, r.y + g, r.w - 2 * g, r.h - 2 * g - c * 0.16, raio);
   ctx.fill();
-  // brilho em cima
-  if (c >= 8) {
-    ctx.fillStyle = CLARA[cor];
-    rr(ctx, r.x + c * 0.2, r.y + c * 0.13, r.w - c * 0.4, c * 0.13, c * 0.065);
-    ctx.fill();
-  }
 }
 
 /** Desenha tudo: moldura cinza-lilás arredondada, bandeja e os quadradinhos que ainda estão no quadro. */
