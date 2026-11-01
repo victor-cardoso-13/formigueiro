@@ -14,9 +14,22 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
+/* iPhone/iPad na Tela de Início (iOS 26, bug WebKit 301108): com status-bar "black-translucent" +
+   viewport-fit=cover, a janela do app fica MENOR que a tela (pela altura da barra de status) e o WebKit
+   nem desenha conteúdo fixo ali: sobra uma faixa lisa embaixo. O iOS só dá a janela inteira se a página
+   for pelo menos tão alta quanto a tela. O min() com 100lvh evita rolagem onde o recuo do topo é 0
+   (WebKit 316008). Só vale no modo app. Não apague. */
+@media (display-mode: standalone) {
+  html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top))); }
+}
+/* Fundo no ::before fixo (nunca no body/html): senão o iOS deixa uma faixa lisa embaixo. */
+html { background-color: #f6eee2; }
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(circle at 50% 0%, #fffaf2, #f6eee2 70%);
+}
 body {
   font-family: 'Nunito', -apple-system, system-ui, sans-serif; font-weight: 600;
-  background: radial-gradient(circle at 50% 0%, #fffaf2, #f6eee2 70%);
   color: var(--tinta);
   user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -25,8 +38,7 @@ body {
 /* iPhone: sem zoom de dois toques em lugar nenhum (a grade bloqueia tudo, ver main.ts) */
 * { touch-action: manipulation; }
 #app {
-  position: relative;
-  height: 100dvh;
+  position: fixed; inset: 0;
   display: flex; flex-direction: column; align-items: center;
   padding: max(14px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   gap: 10px;
@@ -269,3 +281,16 @@ h2 { font-family: var(--titulo); font-weight: 700; margin: 0; }
 .linha-ajuste.ligado .chave i { background: #6bbf7a; }
 .linha-ajuste.ligado .chave i::after { left: 34px; }
 .linha-ajuste .chave em { font-style: normal; font-weight: 800; font-size: 15px; }
+
+/* ===== Telas de início / mapa / tutorial / ajustes (seção do agente das telas de menu) ===== */
+.ilus svg.cena { width: 100%; max-width: 400px; height: auto; max-height: 38dvh; transform: none; }
+.ilus svg.cena text { font-family: var(--titulo); font-weight: 700; }
+@media (min-aspect-ratio: 11/10) {
+  .tutorial { padding-top: 54px; }
+  .ilus svg.cena { max-width: 100%; max-height: min(300px, 70dvh); }
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  .ilus svg.cena { max-width: 520px; max-height: 44dvh; transform: none; }
+  .ilus { min-height: 0; }
+  .tutorial .texto-tut { font-size: 28px; max-width: 640px; }
+}

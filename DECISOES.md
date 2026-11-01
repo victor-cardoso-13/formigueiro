@@ -14,3 +14,25 @@
 - **Previsão 👀:** simula uma volta da formiga sozinha, sem contar as outras formigas que já estejam na trilha.
 - **Torrão duro REMOVIDO** a pedido do Victor (1/nov): saiu do motor, do gerador, das fases (36–60 foram geradas de novo), dos testes e da tela.
 - **Ajustes:** nova tela com 2 chaves, desligadas por padrão: "Ajuda do olho" (👁 N + contorno nos pedacinhos à vista) e "Símbolos nas cores" (para daltonismo).
+
+---
+
+# Refeito em 1/nov: estilo "Colony Flow" (decisão do Victor)
+
+**Decisão:** o jogo foi refeito do zero na jogabilidade. O Victor pediu, de propósito, a mesma mecânica do Colony Flow:
+quadro de pixels, buraco, **5 vagas**, grade de **ninhos** (cor + número), formigas que pegam quadradinhos **expostos** e levam ao buraco,
+ninhos ligados por **cano**. **Motivo:** ele prefere esse jogo; a versão com trilha e fome era mais difícil de entender para os idosos.
+Substitui as regras abaixo; os visuais da casa (creme/tinta/âmbar, Fredoka/Nunito), a regra "idoso primeiro", o progresso em `localStorage` e o fluxo de testes continuam.
+
+- Motor novo em `src/motor/` (`colonia.ts`, `geometria.ts`, `regras.ts`). 60 fases novas (10/20/20/10), solução congelada em cada uma.
+- **Velocidade** 1×/2×/3× (antes 1×/2×/5×). **Desfazer ilimitado** a qualquer momento (antes só com a trilha vazia). **Recomeçar** pede confirmação.
+- Chave do progresso: **`formigueiro:v2`** (a `v1` era do jogo antigo). Campo `olho` foi removido; só sobra "Símbolos nas cores" em Ajustes.
+- Tutorial novo de 5 passos (ninho tem cor e número; toque na frente; formiga pega da borda; 5 vagas; canos).
+- Tela cheia no iPhone/iPad: fundo em `body::before` e `#app` fixo (padrão da casa), em vez de `height: 100dvh`.
+- `?fase=teste` carrega `src/fases/fase-teste.json` (só testes/prints). A tela do jogo é carregada sob demanda (`import()`).
+
+## OBSOLETO (valia só para o jogo antigo — não usar)
+As decisões abaixo, da versão com trilha, **não valem mais**: Motor "tocar/passo" da trilha · Fim da volta · Vitória limpa a trilha ·
+**Folha seca** · **Dorminhoca** · Travado · Desfazer só com a trilha vazia · toques 0–4/10–14 nas soluções · Previsão 👀 ·
+fome por formiga · Ajuda do olho · velocidade 5×. Também ficam obsoletas as "dificuldades medidas" daquela época (ver `FASES.md` novo).
+Continuam valendo: torrão duro removido (nunca volta), mapa em 4 abas por grupo, desenhos originais.

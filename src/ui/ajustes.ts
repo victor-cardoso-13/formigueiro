@@ -1,9 +1,8 @@
-/** Ajustes: ajudas opcionais, desligadas por padrão. */
+/** Ajustes: a única ajuda opcional (símbolos nas cores), desligada por padrão. */
 import { guardar, progresso, type Ajudas } from './salvar.ts';
 
 const LINHAS: { chave: keyof Ajudas; titulo: string; texto: string }[] = [
-  { chave: 'olho', titulo: 'Ajuda do olho', texto: 'Mostra "👁 N" (quantos pedacinhos a formiga comeria se saísse agora) e um contorno nos pedacinhos que ela enxerga.' },
-  { chave: 'simbolos', titulo: 'Símbolos nas cores', texto: 'Põe um desenhinho (●, ▲, ■…) em cada cor, para quem tem dificuldade de distinguir cores parecidas.' },
+  { chave: 'simbolos', titulo: 'Símbolos nas cores', texto: 'Põe um desenhinho (●, ▲, ■…) em cada cor. Ajuda quem confunde cores parecidas.' },
 ];
 
 export function montarAjustes(app: HTMLElement, voltar: () => void) {

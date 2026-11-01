@@ -1,16 +1,15 @@
 /**
  * Guarda o progresso no próprio aparelho (localStorage). Sem conta, sem nuvem.
- * Se um dia as fases forem recriadas, troque o "v1" da chave.
+ * Se um dia as fases forem recriadas, troque o "v2" da chave.
+ * (v1 era a versão antiga com trilha e fome; o jogo foi refeito e o progresso antigo não vale mais.)
  */
-const CHAVE = 'formigueiro:v1';
+const CHAVE = 'formigueiro:v2';
 
-export type Velocidade = 1 | 2 | 5;
+export type Velocidade = 1 | 2 | 3;
 export type TelaSalva = 'inicio' | 'mapa' | 'jogo';
 
 /** Ajudas opcionais (ficam desligadas até a pessoa ligar em Ajustes). */
 export interface Ajudas {
-  /** 👁 N em cada formiga pronta + contorno nos pedacinhos que ela enxerga */
-  olho: boolean;
   /** símbolo (●▲■…) em cada cor, para quem não distingue bem algumas cores */
   simbolos: boolean;
 }
@@ -25,7 +24,7 @@ export interface Progresso {
   tela: TelaSalva;
 }
 
-const PADRAO: Progresso = { ajudas: { olho: false, simbolos: false }, ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
+const PADRAO: Progresso = { ajudas: { simbolos: false }, ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
 
 let cache: Progresso | null = null;
 
@@ -34,7 +33,17 @@ export function progresso(): Progresso {
   try {
     const bruto = localStorage.getItem(CHAVE);
     const lido = bruto ? JSON.parse(bruto) : {};
-    cache = { ...PADRAO, ...lido, ajudas: { ...PADRAO.ajudas, ...(lido.ajudas ?? {}) } };
+    // só pegamos os campos que existem hoje; qualquer campo antigo (ex.: "olho") é ignorado
+    const v = [1, 2, 3].includes(lido.velocidade) ? (lido.velocidade as Velocidade) : PADRAO.velocidade;
+    cache = {
+      ganhas: Array.isArray(lido.ganhas) ? lido.ganhas.filter((n: unknown) => typeof n === 'number') : [],
+      faseAtual: typeof lido.faseAtual === 'number' ? lido.faseAtual : PADRAO.faseAtual,
+      velocidade: v,
+      tutorialVisto: !!lido.tutorialVisto,
+      faixasVistas: Array.isArray(lido.faixasVistas) ? lido.faixasVistas : [],
+      tela: ['inicio', 'mapa', 'jogo'].includes(lido.tela) ? lido.tela : PADRAO.tela,
+      ajudas: { simbolos: !!lido.ajudas?.simbolos },
+    };
   } catch {
     cache = { ...PADRAO, ajudas: { ...PADRAO.ajudas } };
   }
