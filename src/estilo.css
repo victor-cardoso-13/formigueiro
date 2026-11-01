@@ -37,3 +37,189 @@ svg.ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: ro
 
 /* Botões e demais telas do jogo: acrescente abaixo. Identidade: creme + tinta + âmbar (a mesma do Miaudoku). */
 h1 { font-family: var(--titulo); font-weight: 700; margin: 0; }
+
+/* ===== Formigueiro ===== */
+[hidden] { display: none !important; }
+:root { --verde: #2f9e55; }
+h2 { font-family: var(--titulo); font-weight: 700; margin: 0; }
+.num { font-family: var(--titulo); }
+
+.btn {
+  height: 52px; min-width: 52px; padding: 0 18px; border-radius: 26px;
+  background: #fff; border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta);
+  font-weight: 800; font-size: 19px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  white-space: nowrap; touch-action: manipulation;
+}
+.btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--tinta); }
+.btn:disabled { opacity: 0.38; box-shadow: none; }
+.btn.grande { height: 64px; font-size: 24px; padding: 0 34px; border-radius: 32px; font-family: var(--titulo); }
+.btn.ambar { background: var(--ambar-claro); }
+.btn.redondo { width: 52px; padding: 0; font-family: var(--titulo); font-size: 26px; }
+.btn.vel { font-family: var(--titulo); font-size: 26px; min-width: 76px; }
+
+#app > * { width: 100%; flex: 1; min-height: 0; }
+
+/* ----- tela do jogo ----- */
+.jogo {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto auto; overflow: hidden;
+  gap: 10px; justify-items: center; align-items: center; padding-bottom: 6px;
+}
+.jogo .topo { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.jogo .topo h2 { font-size: clamp(18px, 5vw, 26px); text-align: center; flex: 1; }
+.palco { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.tab { position: relative; flex: none; }
+.tab canvas { display: block; }
+.sobre { position: absolute; inset: 0; pointer-events: none; }
+.espera { display: flex; gap: 8px; padding-top: 12px; justify-content: center; }
+.folha {
+  width: var(--e); height: var(--e); position: relative; border-radius: 6px calc(var(--e) * 0.5) 6px calc(var(--e) * 0.5);
+  background: #dcecc9; border: 3px dashed #86b565; padding: 0; flex: none;
+}
+.folha.cheia { background: #9ccc72; border: 3px solid #3d7a2b; box-shadow: 0 3px 0 #3d7a2b; }
+.folha .f { --t: var(--e); width: 100%; height: 100%; border: 0; box-shadow: none; background: transparent; border-radius: 0; }
+.folha .f .ant { width: 76%; height: 76%; margin: 10% 12%; }
+.colonia { display: flex; gap: 8px; align-items: flex-start; justify-content: center; padding-top: 12px; }
+.col { width: var(--t); display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.col.vazia { height: var(--t); border: 3px dashed #cdbd9f; border-radius: 18px; opacity: 0.5; }
+.tile { width: var(--t); height: var(--t); padding: 0; position: relative; display: block; }
+.f { position: relative; width: 100%; height: 100%; border-radius: 18px; background: #efe5d0; border: 3px solid var(--c); box-shadow: 0 3px 0 var(--c); }
+.f .ant { display: block; width: 78%; height: 78%; margin: 8% 11%; }
+.f .n {
+  position: absolute; right: -7px; bottom: -9px; min-width: calc(var(--t) * 0.46); height: calc(var(--t) * 0.46); padding: 0 6px;
+  border-radius: 999px; background: var(--tinta); color: #fff; border: 2px solid #fff;
+  display: grid; place-items: center; font-family: var(--titulo); font-weight: 700; font-size: max(17px, calc(var(--t) * 0.3));
+}
+.f .ol {
+  position: absolute; left: 50%; top: -13px; transform: translateX(-50%); background: #fff; border: 2px solid var(--tinta); border-radius: 12px;
+  height: 24px; padding: 0 7px; display: flex; align-items: center; gap: 3px; font-family: var(--titulo); font-weight: 700; font-size: 15px; white-space: nowrap; z-index: 2;
+}
+.f .ol.zero { background: #fde4e0; }
+.f .zz { position: absolute; top: 2px; right: 3px; font-family: var(--titulo); font-size: 14px; background: #fff; border-radius: 8px; padding: 0 4px; border: 1.5px solid var(--tinta); }
+.f.dorme .ant { filter: grayscale(0.7); opacity: 0.75; }
+.tile:has(.dorme) { cursor: not-allowed; }
+.seg {
+  width: calc(var(--t) * 0.9); height: var(--peek); min-height: 18px; background: var(--c); border: 2px solid var(--d); border-radius: 8px;
+  color: #fff; display: grid; place-items: center; font-family: var(--titulo); font-weight: 700; font-size: max(13px, calc(var(--peek) * 0.62));
+  -webkit-text-stroke: 3px #3b2f2a; paint-order: stroke fill; line-height: 1;
+}
+.botoes .btn { padding: 0 clamp(10px, 3vw, 18px); font-size: clamp(15px, 4.2vw, 19px); gap: 6px; }
+.botoes .btn.vel { min-width: 64px; font-size: 26px; }
+.botoes { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: nowrap; }
+.treme { animation: treme 0.3s; }
+@keyframes treme { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.fm-trilha { position: absolute; left: 0; top: 0; transition: transform var(--ms, 120ms) linear; will-change: transform; pointer-events: none; z-index: 3; }
+.fm-trilha .ant { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.3)); }
+.fome-t {
+  position: absolute; left: 50%; top: 60%; translate: -50% -50%; min-width: 0.5em; padding: 0 0.1em; height: 0.46em; border-radius: 999px;
+  background: var(--tinta); color: #fff; display: grid; place-items: center; font-family: var(--titulo); font-weight: 700; font-size: 0.4em; line-height: 1;
+}
+.fome-t:empty { display: none; }
+.fm-trilha.foi { opacity: 0; scale: 1.5; transition: opacity 0.3s, scale 0.3s, transform var(--ms, 120ms) linear; }
+.nhac { position: absolute; border-radius: 30%; pointer-events: none; animation: nhac 0.3s ease-out forwards; z-index: 2; }
+@keyframes nhac { from { transform: scale(0.7); opacity: 0.85; } to { transform: scale(1.9); opacity: 0; } }
+
+.jogo.paisagem { grid-template-rows: auto auto 1fr auto; column-gap: 14px; row-gap: 8px; }
+.jogo.paisagem .palco { grid-column: 1; grid-row: 1 / span 4; }
+.jogo.paisagem .topo { grid-column: 2; grid-row: 1; }
+.jogo.paisagem .espera { grid-column: 2; grid-row: 2; }
+.jogo.paisagem .colonia { grid-column: 2; grid-row: 3; align-self: center; }
+.jogo.paisagem .botoes { grid-column: 2; grid-row: 4; }
+
+.cortina { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(251, 246, 238, 0.82); }
+.cartao {
+  background: #fff; border: 3px solid var(--tinta); box-shadow: 0 5px 0 var(--tinta); border-radius: 28px; padding: 22px 26px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: min(92%, 460px);
+}
+.cartao h2 { font-size: 34px; }
+.cartao p { margin: 0; font-size: 20px; }
+.cartao .faixa { font-size: 22px; line-height: 1.3; }
+.cartao .festa { font-size: 48px; line-height: 1; }
+
+/* ----- início ----- */
+.inicio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.inicio h1 { font-size: clamp(40px, 11vw, 72px); }
+.inicio .sub { margin: 0; font-size: clamp(18px, 4vw, 24px); max-width: 520px; }
+.fila-formigas { display: flex; gap: 6px; }
+.fila-formigas span { width: clamp(44px, 12vw, 76px); animation: pula 1.6s ease-in-out infinite; display: block; }
+.fila-formigas .ant { width: 100%; display: block; }
+@keyframes pula { 50% { transform: translateY(-8px); } }
+.botoes-inicio { display: flex; flex-direction: column; gap: 14px; width: min(86%, 340px); margin-top: 8px; }
+.botoes-inicio .btn { width: 100%; }
+.rodape { margin: 4px 0 0; opacity: 0.7; font-size: 16px; }
+@media (min-aspect-ratio: 11/10) {
+  .inicio { gap: 6px; }
+  .fila-formigas span { width: 44px; }
+  .botoes-inicio { flex-direction: row; width: auto; margin-top: 4px; }
+  .botoes-inicio .btn { width: auto; height: 56px; font-size: 22px; padding: 0 26px; }
+}
+
+/* ----- mapa ----- */
+.mapa { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.mapa .topo { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mapa .topo h2 { font-size: 26px; }
+.progr { font-family: var(--titulo); font-size: 20px; min-width: 84px; text-align: right; }
+.abas { display: flex; gap: 8px; width: 100%; }
+.aba {
+  flex: 1; min-height: 56px; border-radius: 18px; background: #fff; border: 3px solid var(--g); color: var(--tinta);
+  font-family: var(--titulo); font-weight: 700; font-size: clamp(15px, 4vw, 20px); line-height: 1.1; padding: 0 4px;
+}
+.aba.ativa { background: var(--g); color: #fff; -webkit-text-stroke: 0; }
+.sub-aba { margin: 0; font-size: 18px; }
+.grade-fases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; align-content: start; flex: 1; min-height: 0; }
+.fase {
+  position: relative; min-height: 64px; border-radius: 20px; background: #fff; border: 3px solid var(--tinta); box-shadow: 0 3px 0 var(--tinta);
+  font-family: var(--titulo); font-weight: 700; font-size: 26px; max-height: 84px;
+}
+.fase:disabled { background: #eee6d6; border-color: #b9ad97; box-shadow: none; color: #8a7d6b; }
+.fase.ganha { background: #f1fadf; border-color: var(--verde); box-shadow: 0 3px 0 var(--verde); }
+.fase.atual { background: var(--ambar-claro); }
+.fase .estrela { position: absolute; right: 6px; top: 2px; font-size: 16px; color: #d79a00; }
+.breve { grid-column: 1 / -1; text-align: center; font-size: 22px; }
+@media (min-aspect-ratio: 11/10) {
+  .grade-fases { grid-template-columns: repeat(10, 1fr); gap: 8px; }
+  .mapa { gap: 6px; }
+  .fase { min-height: 56px; }
+}
+
+/* ----- tutorial ----- */
+.tutorial { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 6px; }
+.tutorial .pular { position: absolute; right: 0; top: 0; height: 48px; font-size: 18px; z-index: 2; }
+.passo-n { font-family: var(--titulo); font-size: 18px; opacity: 0.7; }
+.ilus { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 160px; }
+.ilus.col { flex-direction: column; gap: 10px; }
+.ilus svg { max-width: 100%; height: auto; }
+.mini-tile { position: relative; width: 92px; height: 92px; border-radius: 22px; background: #efe5d0; border: 3px solid var(--c); box-shadow: 0 3px 0 var(--c); flex: none; }
+.mini-tile.peq { width: 72px; height: 72px; }
+.mini-tile .ant { width: 78%; height: 78%; margin: 9% 11%; display: block; }
+.mini-tile .n { position: absolute; right: -8px; bottom: -10px; min-width: 38px; height: 38px; border-radius: 19px; background: var(--tinta); color: #fff; border: 2px solid #fff; display: grid; place-items: center; font-family: var(--titulo); font-weight: 700; font-size: 22px; }
+.linha-vista { display: flex; align-items: center; gap: 4px; }
+.legenda-ilus { margin: 0; font-size: 20px; max-width: 480px; }
+.espera.tut { padding-top: 0; }
+.espera.tut .folha .ant { width: 76%; height: 76%; margin: 12%; display: block; }
+.texto-tut { margin: 0; font-size: clamp(21px, 5.2vw, 30px); line-height: 1.25; max-width: 560px; font-weight: 700; }
+.pontos { display: flex; gap: 8px; }
+.pontos i { width: 12px; height: 12px; border-radius: 50%; background: #d9cdb6; }
+.pontos i.on { background: var(--tinta); }
+.nav-tut { display: flex; gap: 12px; }
+@media (min-aspect-ratio: 11/10) {
+  .tutorial { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto auto auto; column-gap: 16px; row-gap: 8px; align-content: center; align-items: center; }
+  .tutorial .passo-n { grid-column: 1 / -1; grid-row: 1; }
+  .tutorial .ilus { grid-column: 1; grid-row: 2 / span 4; }
+  .tutorial .texto-tut { grid-column: 2; grid-row: 2; font-size: 22px; }
+  .tutorial .pontos { grid-column: 2; grid-row: 3; justify-self: center; }
+  .tutorial .nav-tut { grid-column: 2; grid-row: 4; justify-content: center; }
+  .tutorial .pular { top: -4px; }
+  .ilus svg { max-height: 190px; }
+}
+
+.cartao .acoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+@media (max-height: 460px) {
+  .cartao { padding: 10px 18px; gap: 6px; max-width: 94%; }
+  .cartao .festa { font-size: 28px; }
+  .cartao h2 { font-size: 26px; }
+  .cartao p { font-size: 17px; }
+  .cartao .faixa { font-size: 18px; }
+  .cartao .btn.grande { height: 52px; font-size: 21px; padding: 0 22px; }
+  .cartao .btn { height: 48px; font-size: 17px; }
+}

@@ -23,7 +23,7 @@ export const PALETA: CorPaleta[] = [
   { letra: 'k', nome: 'rosa', cor: '#f58fb8', escura: '#b04a77' },
   { letra: 'm', nome: 'marrom', cor: '#8b5a2b', escura: '#53320f' },
   { letra: 'd', nome: 'grafite', cor: '#3f3f4d', escura: '#1d1d26' },
-  { letra: 'w', nome: 'branco', cor: '#fffdf6', escura: '#b9b2a2' },
+  { letra: 'w', nome: 'branco', cor: '#fffdf6', escura: '#8c8470' },
 ];
 
 export const LETRAS = PALETA.map((c) => c.letra).join('');

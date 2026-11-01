@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock — tela do Formigueiro</title>
+<!-- MOCK estático (não é o jogo): mostra a ideia da tela em pé e deitado. Abra com ?modo=pe ou ?modo=deitado -->
+<style>
+:root{--tinta:#3b2f2a;--creme:#fbf6ee;--ambar:#e7a400;--t:68px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{font-family:'Nunito',system-ui,sans-serif;font-weight:700;color:var(--tinta);background:radial-gradient(circle at 50% 0,#fffaf2,#f6eee2 70%)}
+h1,h2,.num{font-family:'Fredoka',system-ui,sans-serif}
+.app{height:100vh;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px}
+.topo{width:100%;display:flex;align-items:center;justify-content:space-between;height:48px}
+.topo h2{margin:0;font-size:22px}
+.btn{height:48px;min-width:48px;padding:0 16px;border-radius:24px;background:#fff;border:3px solid var(--tinta);font-weight:800;font-size:18px;box-shadow:0 3px 0 var(--tinta);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.palco{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+.tab{position:relative;background:#e3d0ad;border-radius:18px;box-shadow:inset 0 0 0 3px #c9b186}
+.tab svg{display:block;width:100%;height:100%}
+.espera{display:flex;gap:8px}
+.folha{width:56px;height:56px;border-radius:4px 28px 4px 28px;background:#cfe6b8;border:3px dashed #7fae5e;display:grid;place-items:center}
+.folha.cheia{background:#8fc468;border:3px solid #3d7a2b}
+.colonia{display:flex;gap:8px;align-items:flex-start}
+.col{width:var(--t);height:calc(var(--t)*1.95);position:relative}
+.f{position:absolute;left:0;width:var(--t);height:var(--t);border-radius:18px;background:#fff;border:3px solid var(--c);box-shadow:0 3px 0 var(--c)}
+.f svg{width:78%;height:78%;margin:8% 11%}
+.f .n{position:absolute;right:-6px;bottom:-8px;min-width:30px;height:30px;border-radius:15px;background:var(--tinta);color:#fff;font-size:20px;display:grid;place-items:center;padding:0 6px}
+.f .ol{position:absolute;left:-4px;top:-14px;background:#fff;border:2px solid var(--tinta);border-radius:12px;font-size:14px;padding:0 6px;height:22px;display:flex;align-items:center;gap:3px}
+.f.dorme{filter:saturate(.35);opacity:.9}
+.f.dorme::after{content:'zzz';position:absolute;top:2px;right:6px;font-size:14px}
+.botoes{display:flex;gap:10px}
+.pe .app{max-width:600px;margin:0 auto}
+.deitado .app{flex-direction:row;align-items:stretch;gap:12px}
+.deitado .esq{flex:0 0 auto;display:flex;align-items:center}
+.deitado .dir{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px}
+</style></head>
+<body>
+<div id="raiz"></div>
+<script>
+const PAL={r:['#d9342b','#8f1d17'],o:['#f08a1c','#a85a00'],y:['#f7d23e','#a8860a'],g:['#2f9e55','#16602f'],b:['#2f5fd0','#173a8c'],c:['#37c1dc','#13798d'],p:['#8a4bb8','#52277a'],k:['#f58fb8','#b04a77'],m:['#8b5a2b','#53320f'],d:['#3f3f4d','#1d1d26'],w:['#fffdf6','#b9b2a2']};
+const GATO=['dd......dd','ddd....ddd','dddddddddd','dddddddddd','ddyyddyydd','ddyyddyydd','ddddwwdddd','dddwddwddd','.dddddddd.','..dddddd..'];
+function ant(l){const [c,e]=PAL[l];return `<svg viewBox="0 0 64 64"><g stroke="${e}" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M24 28 10 22M24 34 8 36M25 41 12 52M40 28 54 22M40 34 56 36M39 41 52 52M28 12Q24 4 18 5M36 12Q40 4 46 5"/></g><g fill="${c}" stroke="${e}" stroke-width="2.6"><ellipse cx="32" cy="50" rx="11" ry="12"/><ellipse cx="32" cy="33" rx="8" ry="8"/><circle cx="32" cy="18" r="9.5"/></g><g stroke="${e}" stroke-width="1.6"><circle cx="28" cy="16" r="3.2" fill="#fff"/><circle cx="36" cy="16" r="3.2" fill="#fff"/></g><circle cx="28.6" cy="16" r="1.4" fill="#222"/><circle cx="36.6" cy="16" r="1.4" fill="#222"/></svg>`}
+function tab(w,h){const L=10,A=10,n=L+2,s=Math.min(w/n,h/n);const W=n*s;let g='';
+ g+=`<rect x="0" y="0" width="${W}" height="${W}" rx="${s*.6}" fill="#e3d0ad"/><rect x="${s*.5}" y="${s*.5}" width="${W-s}" height="${W-s}" rx="${s*.4}" fill="#d6bf96"/><rect x="${s}" y="${s}" width="${L*s}" height="${A*s}" rx="${s*.2}" fill="#f6ead4"/>`;
+ GATO.forEach((r,y)=>[...r].forEach((ch,x)=>{if(ch=='.')return;const [c,e]=PAL[ch];const o=(x+y)%7==0;
+  g+=`<rect x="${(x+1)*s+s*.07}" y="${(y+1)*s+s*.07}" width="${s*.86}" height="${s*.86}" rx="${s*.2}" fill="${c}" stroke="${o?'#fff':e}" stroke-width="${o?s*.1:s*.05}"/><rect x="${(x+1)*s+s*.2}" y="${(y+1)*s+s*.17}" width="${s*.22}" height="${s*.12}" rx="${s*.05}" fill="#fff" opacity=".55"/>`}));
+ return `<svg viewBox="0 0 ${W} ${W}" style="width:${W}px;height:${W}px">${g}<g transform="translate(${s*.0},${s*(A+1)})"></g></svg><div style="position:absolute;left:${s*.2}px;top:${s*(A+1)-s*.5}px;width:${s*1.6}px;height:${s*1.6}px;transform:rotate(0deg)">${ant('y')}</div><div style="position:absolute;left:${s*(L*.5)}px;top:${-s*.1}px;width:${s*1.6}px;height:${s*1.6}px;transform:rotate(90deg)">${ant('r')}</div>`}
+function colonia(){const cols=[['y','w','r','d'],['r','y','y'],['d','r','w','y']];return cols.map((c,i)=>`<div class="col">${c.slice(0,4).map((l,j)=>`<div class="f ${i==2&&j==0?'dorme':''}" style="--c:${PAL[l][1]};top:${j*20}px;z-index:${9-j};${j>0?'transform:scale(.92)':''}">${ant(l)}${j==0?`<span class="n num">${[12,8,30][i]}</span>${i!=2?`<span class="ol">👀 ${[7,0,0][i]}</span>`:''}`:''}</div>`).join('')}</div>`).join('')}
+const modo=new URLSearchParams(location.search).get('modo')||'pe';
+document.body.className=modo;
+const W=innerWidth,H=innerHeight;
+const topo=`<div class="topo"><button class="btn">☰ Fases</button><h2>Fase 9 · Gato</h2><button class="btn">?</button></div>`;
+const esp=`<div class="espera">${[0,1,2,3,4].map(i=>`<div class="folha ${i<1?'cheia':''}">${i<1?`<div style="width:42px">${ant('c')}</div>`:''}</div>`).join('')}</div>`;
+const bot=`<div class="botoes"><button class="btn">↶ Desfazer</button><button class="btn">↻ Recomeçar</button><button class="btn num" style="font-size:24px">2×</button></div>`;
+if(modo=='pe'){document.getElementById('raiz').innerHTML=`<div class="app">${topo}<div class="palco"><div class="tab" id="tb"></div></div>${esp}<div class="colonia" style="--t:${Math.min(78,Math.floor((W-20)/3)-8)}px">${colonia()}</div>${bot}</div>`;
+ const p=document.querySelector('.palco').getBoundingClientRect();document.getElementById('tb').innerHTML=tab(Math.min(p.width,p.height),Math.min(p.width,p.height));}
+else{const s=H-20;document.getElementById('raiz').innerHTML=`<div class="app"><div class="esq"><div class="tab" id="tb" style="width:${s}px;height:${s}px"></div></div><div class="dir"><div class="topo" style="height:44px"><button class="btn">☰ Fases</button><h2 style="font-size:20px">Fase 9 · Gato</h2><button class="btn">?</button></div>${esp}<div class="colonia" style="--t:64px">${colonia()}</div>${bot}</div></div>`;document.getElementById('tb').innerHTML=tab(s,s);}
+</script></body></html>
