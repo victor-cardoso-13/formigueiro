@@ -1,258 +1,180 @@
 import { describe, expect, it } from 'vitest';
 import { REGRAS } from '../src/motor/regras.ts';
-import { alvo, trilha } from '../src/motor/trilha.ts';
-import { clonar, novoEstado, passo, podeTocar, previsao, rodarAteParar, tocar } from '../src/motor/jogo.ts';
-import { cel, fase } from './ajuda.ts';
+import { acumular, caminhoIda, caminhoVolta, centroVaga, buraco, posicaoNoCaminho } from '../src/motor/geometria.ts';
+import { clonar, expostos, frente, motivoDeNaoPoder, novoEstado, parado, passo, podeTocar, rodarAteParar, tocar, unidade } from '../src/motor/colonia.ts';
+import { fase } from './ajuda.ts';
 
-const A = { coluna: 0 };
-
-describe('trilha', () => {
-  it('tem 2L+2A+4 posições, começa na entrada embaixo à esquerda e tem 4 cantos', () => {
-    const t = trilha(3, 3);
-    expect(t.length).toBe(16);
-    expect(t[0]).toMatchObject({ x: -1, y: 3, canto: true });
-    expect(t.filter((p) => p.canto).length).toBe(4);
-    expect(t[1]).toMatchObject({ x: -1, y: 2, dx: 1, dy: 0 }); // sobe pela esquerda olhando para a direita
-    expect(t[5]).toMatchObject({ x: 0, y: -1, dx: 0, dy: 1 }); // topo olhando para baixo
-    expect(t[9]).toMatchObject({ x: 3, y: 0, dx: -1, dy: 0 }); // desce pela direita olhando para a esquerda
-    expect(t[13]).toMatchObject({ x: 2, y: 3, dx: 0, dy: -1 }); // embaixo olhando para cima
+describe('quadradinhos expostos', () => {
+  it('só os primeiros de cada linha/coluna vistos de fora; os de trás ficam escondidos', () => {
+    // 3x3 cheio de cor 0: expostos = todas as bordas (8 células), o do meio fica escondido
+    const e = novoEstado(fase(['000', '000', '000'], [[{ cor: 0, n: 9 }]]));
+    const xs = new Set(expostos(e, 0).map((c) => `${c.x},${c.y}`));
+    expect(xs.size).toBe(8);
+    expect(xs.has('1,1')).toBe(false);
   });
-  it('só vê o primeiro pedacinho da linha', () => {
-    const e = novoEstado(fase(['.1.', '...', '...'], [[{ cor: 1, fome: 1 }]]));
-    const t = trilha(3, 3);
-    expect(alvo(e.desenho, 3, 3, t[3])).toEqual({ x: 1, y: 0 }); // linha 0 pela esquerda
-    expect(alvo(e.desenho, 3, 3, t[2])).toBeNull(); // linha 1 vazia
-    expect(alvo(e.desenho, 3, 3, t[0])).toBeNull(); // canto
+  it('só mostra a cor pedida e depois que o da frente some, o de trás aparece', () => {
+    const e = novoEstado(fase(['01', '..'], [[{ cor: 1, n: 1 }]]));
+    // linha 0 vista da esquerda: primeiro é a cor 0 (esconde a cor 1); vista da direita: a cor 1 aparece
+    const lados = expostos(e, 1).map((c) => c.lado);
+    expect(lados).toContain('dir');
+    expect(lados).not.toContain('esq');
+    e.desenho[0][0] = -1;
+    expect(expostos(e, 1).map((c) => c.lado)).toContain('esq');
   });
 });
 
-describe('uma volta completa numa grade 3x3', () => {
-  it('come na ordem do percurso, 1 por passo, e vai para a espera com a fome que sobrou', () => {
-    const e = novoEstado(fase(['000', '000', '000'], [[{ cor: 0, fome: 99 }]]));
-    expect(tocar(e, A)).not.toBeNull();
-    expect(e.trilha[0].pos).toBe(0);
-    const comidos: [number, number][] = [];
-    let passos = 0;
-    while (e.trilha.length) {
-      for (const ev of passo(e)) if (ev.tipo === 'comeu') comidos.push([ev.x, ev.y]);
-      passos++;
-    }
-    expect(passos).toBe(16);
-    expect(comidos).toEqual([[0, 2], [0, 1], [0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2]]);
-    expect(cel(e)).toEqual(['...', '.0.', '...']);
-    expect(e.espera[0]?.fome).toBe(91);
-    expect(e.pedacos).toBe(1);
+describe('geometria', () => {
+  it('o caminho começa na vaga, termina no buraco e passa pelo quadradinho', () => {
+    const h = 0.75;
+    const ida = caminhoIda(4, h, centroVaga(h, 0), 1, 1, 'esq');
+    const volta = caminhoVolta(4, h, 1, 1, 'esq');
+    expect(ida[0]).toEqual(centroVaga(h, 0));
+    expect(ida[ida.length - 1]).toEqual({ x: 1.5 / 4, y: 1.5 / 4 });
+    expect(volta[volta.length - 1]).toEqual(buraco(h));
+    const caminho = [...ida, ...volta.slice(1)];
+    const ac = acumular(caminho);
+    const p0 = posicaoNoCaminho(caminho, ac, 0);
+    expect(p0.x).toBeCloseTo(centroVaga(h, 0).x);
+    const fim = posicaoNoCaminho(caminho, ac, 999);
+    expect(fim.x).toBeCloseTo(buraco(h).x);
+    expect(fim.y).toBeCloseTo(buraco(h).y);
   });
-  it('no máximo 1 pedacinho por passo', () => {
-    const e = novoEstado(fase(['00', '00'], [[{ cor: 0, fome: 9 }]]));
-    tocar(e, A);
-    const antes = e.pedacos;
-    passo(e);
-    expect(antes - e.pedacos).toBeLessThanOrEqual(1);
+  it('o caminho pelo contorno nunca atravessa o quadro (fora das bordas, exceto a entrada final)', () => {
+    const h = 1;
+    const ida = caminhoIda(4, h, centroVaga(h, 4), 0, 3, 'topo');
+    // todos os pontos menos o último ficam fora do quadro (x<0, x>1, y<0 ou y>h)
+    for (const p of ida.slice(0, -1)) expect(p.x < 0 || p.x > 1 || p.y < 0 || p.y > h).toBe(true);
   });
 });
 
-describe('o que ela come', () => {
-  it('só come a própria cor e NÃO pula para o de trás quando o primeiro é de outra cor', () => {
-    const e = novoEstado(fase(['10', '..'], [[{ cor: 0, fome: 5 }]]));
-    // Linha 0 pela esquerda: o primeiro é '1' (outra cor); o '0' atrás dele fica escondido.
-    tocar(e, A);
-    for (let i = 0; i < 4; i++) passo(e); // percorre a esquerda (linhas 1 e 0)
-    expect(cel(e)).toEqual(['10', '..']);
-    rodarAteParar(e);
-    // Pela direita, a linha 0 mostra o '0' primeiro: aí sim come.
-    expect(cel(e)).toEqual(['1.', '..']);
-  });
-  it('fome 0: a formiga vai embora na hora, sem esperar', () => {
-    const e = novoEstado(fase(['000', '...', '...'], [[{ cor: 0, fome: 1 }]]));
-    tocar(e, A);
-    const evs = [];
-    while (e.trilha.length) evs.push(...passo(e));
-    expect(evs.some((x) => x.tipo === 'foiEmbora')).toBe(true);
-    expect(e.espera.every((x) => x === null)).toBe(true);
-    expect(e.pedacos).toBe(2);
-  });
-  it('cantos não comem', () => {
-    // Só existe o pedacinho (0,0): pela esquerda (posição 3) ele já seria visto; testamos que no canto (4) nada acontece.
-    const e = novoEstado(fase(['0.', '..'], [[{ cor: 0, fome: 9 }]]));
-    tocar(e, A);
-    e.trilha[0].pos = 2; // última linha antes do canto de cima à esquerda
-    passo(e); // posição 3 = canto: não come
-    expect(e.pedacos).toBe(1);
-  });
-});
-
-describe('fim de jogo', () => {
-  it('vitória quando o desenho fica vazio', () => {
-    const e = novoEstado(fase(['0'], [[{ cor: 0, fome: 1 }]]));
-    tocar(e, A);
-    rodarAteParar(e);
-    expect(e.resultado).toBe('vitoria');
-  });
-  it('derrota quando a volta acaba com fome e não há lugar de espera', () => {
-    const e = novoEstado(fase(['1'], [[{ cor: 0, fome: 1 }]]));
-    e.espera = e.espera.map((_, i) => ({ id: 100 + i, cor: 1, fome: 1 }));
-    tocar(e, A);
-    rodarAteParar(e);
-    expect(e.resultado).toBe('derrota');
-    expect(e.motivo).toMatch(/onde esperar/);
-  });
-  it('volta com fome vai para o primeiro lugar de espera livre', () => {
-    const e = novoEstado(fase(['1'], [[{ cor: 0, fome: 1 }]]));
-    e.espera[0] = { id: 100, cor: 1, fome: 1 };
-    tocar(e, A);
-    rodarAteParar(e);
-    expect(e.espera[1]?.cor).toBe(0);
-  });
-  it('formiga na espera pode sair de novo', () => {
-    const e = novoEstado(fase(['1'], [[{ cor: 0, fome: 1 }]]));
-    tocar(e, A);
-    rodarAteParar(e);
-    expect(e.espera[0]).not.toBeNull();
-    expect(podeTocar(e, { espera: 0 })).toBe(true);
-    tocar(e, { espera: 0 });
-    expect(e.espera[0]).toBeNull();
-    expect(e.trilha.length).toBe(1);
-  });
-});
-
-describe('torrão duro, folha seca', () => {
-  it('torrão duro precisa de 2 mordidas', () => {
-    const e = novoEstado(fase(['0'], [[{ cor: 0, fome: 2 }]], { duros: [[0, 0]] }));
-    tocar(e, A);
-    let primeira = -1;
-    while (e.trilha.length) {
-      const evs = passo(e);
-      if (primeira < 0 && evs.some((x) => x.tipo === 'comeu')) {
-        primeira = e.passo;
-        expect(e.pedacos).toBe(1); // rachou, mas não sumiu
-        expect(e.desenho[0][0]?.mordidas).toBe(1);
-      }
-    }
-    expect(e.resultado).toBe('vitoria');
-  });
-  it('folha seca: ninguém come, tapa a visão e cai quando um vizinho é comido', () => {
-    // linha: [0 com folha] [0] ; formiga de cor 0 vendo pela esquerda só enxerga o coberto
-    const e = novoEstado(fase(['00', '..'], [[{ cor: 0, fome: 9 }]], { folhas: [[0, 0]] }));
-    tocar(e, A);
-    for (let i = 0; i < 4; i++) passo(e);
-    expect(e.desenho[0][0]?.folha).toBe(true);
-    expect(e.pedacos).toBe(2); // a linha 0 pela esquerda mostra o coberto: nada comido
-    // pela direita, a linha 0 mostra (1,0): come, e a folha de (0,0) cai
-    let caiu = false;
-    while (e.trilha.length && !caiu) caiu = passo(e).some((x) => x.tipo === 'folhaCaiu');
-    expect(caiu).toBe(true);
-    expect(e.desenho[0][0]?.folha).toBe(false);
-    expect(e.desenho[0][1]).toBeNull();
-  });
-});
-
-describe('toques', () => {
-  it('entrada ocupada: o toque é ignorado; depois do passo, entra', () => {
-    const e = novoEstado(fase(['1'], [[{ cor: 0, fome: 1 }], [{ cor: 0, fome: 1 }]]));
-    expect(tocar(e, { coluna: 0 })).not.toBeNull();
-    expect(podeTocar(e, { coluna: 1 })).toBe(false);
-    expect(tocar(e, { coluna: 1 })).toBeNull();
-    passo(e);
-    expect(podeTocar(e, { coluna: 1 })).toBe(true);
-  });
-  it(`com ${REGRAS.MAX_NA_TRILHA} formigas na trilha o toque é ignorado`, () => {
-    const cols = Array.from({ length: 6 }, () => [{ cor: 0, fome: 9 }]);
-    const e = novoEstado(fase(['1111111111'], cols));
-    for (let i = 0; i < 5; i++) {
-      expect(tocar(e, { coluna: i })).not.toBeNull();
-      passo(e);
-    }
-    expect(e.trilha.length).toBe(5);
-    expect(tocar(e, { coluna: 5 })).toBeNull();
-  });
-  it('só a primeira de cada coluna sai', () => {
-    const e = novoEstado(fase(['1'], [[{ cor: 0, fome: 1 }, { cor: 1, fome: 1 }]]));
-    tocar(e, A);
-    expect(e.colunas[0].length).toBe(1);
-    expect(e.colunas[0][0].cor).toBe(1);
-  });
-  it('duas formigas veem o mesmo pedacinho no mesmo passo: a que entrou primeiro (à frente) come', () => {
-    const e = novoEstado(fase(['0.', '..'], [[{ cor: 0, fome: 1 }], [{ cor: 0, fome: 1 }]]));
-    const [a, b] = [e.colunas[0].shift()!, e.colunas[1].shift()!];
-    // b entrou antes e está à frente (posição 3 -> 4 vê a coluna 0); a vem atrás (1 -> 2 vê a linha 0): ambos veem (0,0).
-    e.trilha = [
-      { formiga: b, pos: 3, origem: { coluna: 1 } },
-      { formiga: a, pos: 1, origem: { coluna: 0 } },
-    ];
-    const comeu: number[] = [];
-    for (const ev of passo(e)) if (ev.tipo === 'comeu') comeu.push(ev.id);
-    expect(comeu).toEqual([b.id]);
-  });
-});
-
-describe('formiga dorminhoca', () => {
-  const cols = () => [
-    [{ cor: 0, fome: 1, dorme: true }, { cor: 0, fome: 1 }],
-    [{ cor: 0, fome: 1 }],
-    [{ cor: 0, fome: 1 }],
-    [{ cor: 0, fome: 1 }],
-    [{ cor: 0, fome: 1 }],
+describe('ninhos e vagas', () => {
+  const grade = [
+    [{ cor: 0, n: 2 }, { cor: 1, n: 1 }],
+    [{ cor: 0, n: 1 }, null],
   ];
-  it('não pode ser tocada e acorda depois de 3 saídas de outras colunas (3, 2, 1)', () => {
-    const e = novoEstado(fase(['11111111'], cols()));
-    expect(e.colunas[0][0].dorme).toBe(3);
-    expect(podeTocar(e, { coluna: 0 })).toBe(false);
-    tocar(e, { coluna: 1 });
-    expect(e.colunas[0][0].dorme).toBe(2);
-    passo(e);
-    tocar(e, { coluna: 2 });
-    expect(e.colunas[0][0].dorme).toBe(1);
-    passo(e);
-    const evs = tocar(e, { coluna: 3 })!;
-    expect(evs.some((x) => x.tipo === 'acordou')).toBe(true);
-    expect(e.colunas[0][0].dorme).toBeUndefined();
-    passo(e);
-    expect(podeTocar(e, { coluna: 0 })).toBe(true);
+  it('só os ninhos da frente de cada coluna podem ser tocados', () => {
+    const e = novoEstado(fase(['01', '00'], grade));
+    expect(frente(e).map((n) => n.id)).toEqual([1, 2]);
+    expect(podeTocar(e, 1)).toBe(true);
+    expect(podeTocar(e, 3)).toBe(false);
+    expect(motivoDeNaoPoder(e, 3)).toBe('atras');
   });
-  it('saída de um lugar de espera não conta', () => {
-    const e = novoEstado(fase(['1'], cols()));
-    e.espera[0] = { id: 99, cor: 0, fome: 1 };
-    tocar(e, { espera: 0 });
-    expect(e.colunas[0][0].dorme).toBe(3);
+  it('ao subir, o ninho ocupa a primeira vaga livre e o de trás passa para a frente', () => {
+    const e = novoEstado(fase(['01', '00'], grade));
+    tocar(e, 1);
+    expect(e.vagas[0]?.id).toBe(1);
+    expect(frente(e).map((n) => n.id)).toEqual([3, 2]);
   });
-  it('só conta a partir do momento em que chega à frente da coluna', () => {
-    const e = novoEstado(
-      fase(['11111111'], [
-        [{ cor: 0, fome: 1 }, { cor: 0, fome: 1, dorme: true }],
-        [{ cor: 0, fome: 1 }],
-      ]),
-    );
-    tocar(e, { coluna: 0 }); // a dorminhoca chega à frente agora: esta saída não conta
-    expect(e.colunas[0][0].dorme).toBe(3);
-    passo(e);
-    tocar(e, { coluna: 1 });
-    expect(e.colunas[0][0].dorme).toBe(2);
-  });
-  it('travado: só sobram dorminhocas na frente e nada na espera', () => {
-    const e = novoEstado(fase(['11'], [[{ cor: 0, fome: 1, dorme: true }]]));
-    expect(e.resultado).toBe('travado');
+  it('ninhos ligados por cano sobem juntos e precisam de vagas livres para todos', () => {
+    const f = fase(['012', '012'], [[{ cor: 0, n: 2, g: 1 }, { cor: 1, n: 2, g: 1 }, { cor: 2, n: 2 }]]);
+    const e = novoEstado(f);
+    expect(unidade(e, 2)!.map((n) => n.id)).toEqual([1, 2]);
+    // ocupa 4 vagas: sobra 1 e o grupo (2) não cabe
+    for (let i = 0; i < 4; i++) e.vagas[i] = { id: 90 + i, cor: 5, n: 1, restam: 1, espera: 0 };
+    expect(motivoDeNaoPoder(e, 1)).toBe('vagas');
+    expect(tocar(e, 1)).toBeNull();
+    e.vagas[3] = null;
+    expect(podeTocar(e, 2)).toBe(true);
+    tocar(e, 2);
+    expect(e.vagas.filter(Boolean).length).toBe(5);
+    expect(e.grade[0][0]).toBeNull();
+    expect(e.grade[0][1]).toBeNull();
   });
 });
 
-describe('previsão (👀 N)', () => {
-  it('bate com uma volta de verdade', () => {
-    const f = fase(['0120', '2010', '1201', '0.12'], [[{ cor: 0, fome: 4 }, { cor: 1, fome: 3 }], [{ cor: 2, fome: 20 }]]);
-    for (const origem of [{ coluna: 0 }, { coluna: 1 }]) {
-      const e = novoEstado(f);
-      const antes = e.pedacos;
-      const p = previsao(e, origem);
-      const real = clonar(e);
-      tocar(real, origem);
-      rodarAteParar(real);
-      expect(antes - real.pedacos).toBe(p.comeria);
-      expect(JSON.stringify(e)).toBe(JSON.stringify(novoEstado(f))); // não mexeu no estado
-    }
+describe('formigas', () => {
+  it('uma formiga vai até o quadradinho, pega (ele some) e leva até o buraco', () => {
+    const e = novoEstado(fase(['0'], [[{ cor: 0, n: 1 }]]));
+    tocar(e, 1);
+    const evs = [];
+    for (let i = 0; i < 400 && e.resultado === 'jogando'; i++) evs.push(...passo(e));
+    const tipos = evs.map((x) => x.tipo);
+    expect(tipos.indexOf('saiu')).toBeLessThan(tipos.indexOf('pegou'));
+    expect(tipos.indexOf('pegou')).toBeLessThan(tipos.indexOf('entregou'));
+    expect(e.resultado).toBe('vitoria');
+    expect(e.vagas.every((v) => v === null)).toBe(true);
   });
-  it('conta o que só fica à vista depois de comer o da frente, e marca os à vista da cor dela', () => {
-    const e = novoEstado(fase(['00', '..'], [[{ cor: 0, fome: 9 }]]));
-    const p = previsao(e, A);
-    expect(p.comeria).toBe(2);
-    expect(p.celulasAVista.length).toBe(2);
+  it('várias formigas saem do mesmo ninho, uma depois da outra, e o número de formigas que faltam cai', () => {
+    const e = novoEstado(fase(['000', '000', '000'], [[{ cor: 0, n: 9 }]]));
+    tocar(e, 1);
+    const restos: number[] = [];
+    let saidas = 0;
+    for (let i = 0; i < 60; i++) {
+      saidas += passo(e).filter((x) => x.tipo === 'saiu').length;
+      if (e.vagas[0]) restos.push(e.vagas[0].restam);
+    }
+    expect(saidas).toBeGreaterThan(5);
+    expect(restos[0]).toBeGreaterThan(restos[restos.length - 1] ?? 0);
+    expect(e.formigas.length).toBeGreaterThan(1); // várias ao mesmo tempo
+  });
+  it('cada quadradinho só é escolhido por uma formiga', () => {
+    const e = novoEstado(fase(['00', '00'], [[{ cor: 0, n: 4 }]]));
+    tocar(e, 1);
+    for (let i = 0; i < 40; i++) passo(e);
+    const alvos = e.formigas.map((f) => `${f.alvo.x},${f.alvo.y}`);
+    expect(new Set(alvos).size).toBe(alvos.length);
+  });
+  it('só pega quadradinhos da cor do ninho e só os expostos (o de trás espera o da frente sair)', () => {
+    // linha única: 1 0 ; ninho da cor 0 só enxerga o 0 pela direita
+    const e = novoEstado(fase(['10'], [[{ cor: 0, n: 1 }, { cor: 1, n: 1 }]]));
+    tocar(e, 1);
+    rodarAteParar(e);
+    expect(e.desenho[0]).toEqual([1, -1]);
+    expect(e.pedacos).toBe(1);
+  });
+  it('ninho cuja cor está escondida espera na vaga e só pega depois que a cor da frente sai', () => {
+    // cor 1 escondida no centro de um quadro 3×3 de cor 0
+    const e = novoEstado(fase(['000', '010', '000'], [[{ cor: 1, n: 1 }, { cor: 0, n: 8 }]]));
+    expect(expostos(e, 1).length).toBe(0);
+    tocar(e, 1); // ninho da cor 1: nada para pegar ainda
+    for (let i = 0; i < 30; i++) passo(e);
+    expect(e.formigas.length).toBe(0);
+    expect(e.vagas[0]?.restam).toBe(1); // continua esperando, ocupando a vaga
+    tocar(e, 2); // agora o ninho da cor 0 abre caminho
+    for (let i = 0; i < 2000 && e.resultado === 'jogando'; i++) passo(e);
+    expect(e.resultado).toBe('vitoria');
+  });
+  it('derrota: vagas cheias de ninhos que não alcançam nada e nada mais pode subir', () => {
+    // cor 1 escondida no centro de um quadro 3×3 de cor 0
+    const e = novoEstado(fase(['000', '010', '000'], [[{ cor: 1, n: 1 }], [{ cor: 1, n: 1 }], [{ cor: 1, n: 1 }], [{ cor: 1, n: 1 }], [{ cor: 1, n: 1 }], [{ cor: 0, n: 8 }]]));
+    // coluna única de 6 ninhos: só o 1º é da frente. Sobem um a um (cada um espera na vaga).
+    for (let i = 1; i <= 5; i++) {
+      expect(tocar(e, i)).not.toBeNull();
+      rodarAteParar(e);
+    }
+    expect(e.vagas.every((v) => !!v)).toBe(true);
+    passo(e);
+    expect(e.resultado).toBe('derrota');
+    expect(e.motivo).toMatch(/vagas/);
+  });
+  it('vitória só quando o quadro esvazia e a última formiga entrega', () => {
+    const e = novoEstado(fase(['00'], [[{ cor: 0, n: 2 }]]));
+    tocar(e, 1);
+    let venceuCedo = false;
+    for (let i = 0; i < 600 && e.resultado === 'jogando'; i++) {
+      passo(e);
+      if (e.pedacos === 0 && e.formigas.length > 0 && e.resultado !== 'jogando') venceuCedo = true;
+    }
+    expect(venceuCedo).toBe(false);
+    expect(e.resultado).toBe('vitoria');
+  });
+});
+
+describe('estado', () => {
+  it('é determinístico e dá para clonar (Desfazer)', () => {
+    const f = fase(['0011', '0011'], [[{ cor: 0, n: 4 }, { cor: 1, n: 4 }]]);
+    const a = novoEstado(f);
+    const antes = clonar(a);
+    tocar(a, 1);
+    for (let i = 0; i < 30; i++) passo(a);
+    const b = clonar(antes);
+    tocar(b, 1);
+    for (let i = 0; i < 30; i++) passo(b);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(antes.vagas.every((v) => v === null)).toBe(true); // o "antes" não foi mexido
+    expect(parado(antes)).toBe(true);
+  });
+  it(`as constantes da casa: ${REGRAS.VAGAS} vagas`, () => {
+    expect(REGRAS.VAGAS).toBe(5);
   });
 });

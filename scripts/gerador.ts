@@ -42,15 +42,14 @@ export interface Parametros {
   /** chance de reaproveitar uma formiga da espera quando ela já consegue terminar */
   pReuso: number;
   folhas: number; // fração das células
-  duros: number; // fração
   dorminhocas: number; // quantidade
 }
 
 export const PADRAO: Record<Grupo, Parametros> = {
-  facil: { colunas: 2, fomeMin: 4, fomeMax: 20, pSobra: 0, sobraMax: 3, maxEspera: 2, pReuso: 0.5, folhas: 0, duros: 0, dorminhocas: 0 },
-  media: { colunas: 3, fomeMin: 5, fomeMax: 30, pSobra: 0.15, sobraMax: 3, maxEspera: 3, pReuso: 0.4, folhas: 0.05, duros: 0, dorminhocas: 0 },
-  dificil: { colunas: 4, fomeMin: 5, fomeMax: 40, pSobra: 0.3, sobraMax: 3, maxEspera: 3, pReuso: 0.35, folhas: 0.06, duros: 0.06, dorminhocas: 2 },
-  'muito-dificil': { colunas: 5, fomeMin: 5, fomeMax: 50, pSobra: 0.4, sobraMax: 3, maxEspera: 4, pReuso: 0.3, folhas: 0.08, duros: 0.08, dorminhocas: 4 },
+  facil: { colunas: 2, fomeMin: 4, fomeMax: 20, pSobra: 0, sobraMax: 3, maxEspera: 2, pReuso: 0.5, folhas: 0, dorminhocas: 0 },
+  media: { colunas: 3, fomeMin: 5, fomeMax: 30, pSobra: 0.15, sobraMax: 3, maxEspera: 3, pReuso: 0.4, folhas: 0.05, dorminhocas: 0 },
+  dificil: { colunas: 4, fomeMin: 5, fomeMax: 40, pSobra: 0.3, sobraMax: 3, maxEspera: 3, pReuso: 0.35, folhas: 0.06, dorminhocas: 2 },
+  'muito-dificil': { colunas: 5, fomeMin: 5, fomeMax: 50, pSobra: 0.4, sobraMax: 3, maxEspera: 4, pReuso: 0.3, folhas: 0.08, dorminhocas: 4 },
 };
 
 export const FAIXA: Record<Grupo, [number, number]> = {
@@ -62,7 +61,7 @@ export const FAIXA: Record<Grupo, [number, number]> = {
 
 export function desenhoDeLinhas(linhas: string[]): (Celula | null)[][] {
   return linhas.map((l) =>
-    [...l].map((ch) => (ch === '.' ? null : { cor: corDeLetra(ch) < 0 ? parseInt(ch, 36) : corDeLetra(ch), mordidas: 1, duro: false, folha: false })),
+    [...l].map((ch) => (ch === '.' ? null : { cor: corDeLetra(ch) < 0 ? parseInt(ch, 36) : corDeLetra(ch), folha: false })),
   );
 }
 
@@ -101,7 +100,7 @@ function volta(desenho: (Celula | null)[][], cor: number, fome: number) {
 
 const somaMordidas = (desenho: (Celula | null)[][], cor: number) => {
   let n = 0;
-  for (const l of desenho) for (const c of l) if (c && c.cor === cor) n += c.mordidas;
+  for (const l of desenho) for (const c of l) if (c && c.cor === cor) n++;
   return n;
 };
 const contaPedacos = (desenho: (Celula | null)[][]) => desenho.reduce((s, l) => s + l.filter(Boolean).length, 0);
@@ -286,7 +285,7 @@ export interface Entrada {
   nome: string;
   linhas: string[]; // letras da paleta
   semente: number;
-  especiais?: { folha?: boolean; duro?: boolean; dorminhoca?: boolean };
+  especiais?: { folha?: boolean; dorminhoca?: boolean };
   faixa?: string;
   /** substitui partes de PADRAO[grupo] */
   param?: Partial<Parametros>;
@@ -308,12 +307,7 @@ export function montar(ent: Entrada, p: Parametros, tentativa: number): Fase | n
   const base = desenhoDeLinhas(ent.linhas);
   const esp = ent.especiais ?? {};
   const folhas = esp.folha ? sorteiaCelulas(base, p.folhas, rng) : [];
-  const duros = esp.duro ? sorteiaCelulas(base, p.duros, rng) : [];
   for (const [x, y] of folhas) base[y][x]!.folha = true;
-  for (const [x, y] of duros) {
-    base[y][x]!.duro = true;
-    base[y][x]!.mordidas = REGRAS.MORDIDAS_TORRAO;
-  }
   const plano = planejar(base, p, rng);
   if (!plano) return null;
   const nColunas = p.colunas;
@@ -321,7 +315,6 @@ export function montar(ent: Entrada, p: Parametros, tentativa: number): Fase | n
   const colunasI = repartir(plano.formigas, nColunas, dormem, rng);
   const especiais: Especial[] = [];
   if (folhas.length) especiais.push('folha');
-  if (duros.length) especiais.push('duro');
   if (colunasI.some((c) => c.some((f) => f.dorme))) especiais.push('dorminhoca');
   const fase: Fase = {
     id: ent.id,
@@ -331,7 +324,6 @@ export function montar(ent: Entrada, p: Parametros, tentativa: number): Fase | n
     altura: ent.linhas.length,
     desenho: congelar(ent.linhas),
     folhas,
-    duros,
     colunas: colunasI as unknown as FormigaFase[][],
     especiais,
     solucao: [],
@@ -379,7 +371,6 @@ export function gerarFase(ent: Entrada, maxTentativas = 14): Resultado {
   const esp = ent.especiais ?? {};
   const fixos: Partial<Parametros> = { ...ent.param };
   if (!esp.folha) fixos.folhas = 0;
-  if (!esp.duro) fixos.duros = 0;
   if (!esp.dorminhoca) fixos.dorminhocas = 0;
   let melhor: Resultado | null = null;
   let melhorDist = Infinity;

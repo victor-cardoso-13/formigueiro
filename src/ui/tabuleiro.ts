@@ -30,6 +30,8 @@ export interface OpcoesDesenho {
   aVista: Set<string>;
   /** cor em foco (dedo em cima de uma formiga): contorno mais forte */
   foco: number | null;
+  /** mostra o símbolo de cada cor (ajuda para daltonismo) */
+  simbolos: boolean;
 }
 
 export function desenhar(canvas: HTMLCanvasElement, g: Geometria, e: Estado, op: OpcoesDesenho) {
@@ -89,22 +91,13 @@ export function desenhar(canvas: HTMLCanvasElement, g: Geometria, e: Estado, op:
         ctx.fill();
       }
       void w;
-      if (s >= 11 && !c.folha) {
-        // símbolo da cor (ajuda quem não distingue bem as cores); no torrão duro, o número de mordidas que faltam
+      if (s >= 11 && !c.folha && op.simbolos) {
+        // símbolo da cor (opcional, ligado em Ajustes)
         const sx = px + ins + ww * 0.5;
         const sy = py + ins + ww * 0.54;
         const tam = ww * 0.52;
         const fill = corDoSimbolo(cor);
-        if (c.duro && s >= 14) {
-          ctx.font = `700 ${Math.round(ww * 0.62)}px Fredoka, Nunito, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.lineWidth = Math.max(2, ww * 0.12);
-          ctx.strokeStyle = fill === '#ffffff' ? '#3b2f2a' : '#fff';
-          ctx.fillStyle = fill;
-          ctx.strokeText(String(c.mordidas), sx, sy);
-          ctx.fillText(String(c.mordidas), sx, sy);
-        } else {
+        {
           ctx.save();
           ctx.translate(sx - tam / 2, sy - tam / 2);
           ctx.scale(tam / 10, tam / 10);
@@ -117,41 +110,14 @@ export function desenhar(canvas: HTMLCanvasElement, g: Geometria, e: Estado, op:
           ctx.restore();
         }
       }
-      if (c.duro) {
-        // torrão duro: borda grossa + faceta; rachado = risco no meio
-        ctx.strokeStyle = '#3b2f2a';
-        ctx.lineWidth = Math.max(2, s * 0.11);
-        rr(ctx, px + ins, py + ins, ww, ww, s * 0.12);
-        ctx.stroke();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = Math.max(1, s * 0.04);
-        rr(ctx, px + ins + s * 0.07, py + ins + s * 0.07, ww - s * 0.14, ww - s * 0.14, s * 0.08);
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-        ctx.lineWidth = Math.max(1, s * 0.05);
-        ctx.beginPath();
-        ctx.moveTo(px + ins + ww * 0.7, py + ins + ww * 0.2);
-        ctx.lineTo(px + ins + ww * 0.82, py + ins + ww * 0.32);
-        ctx.stroke();
-        if (c.mordidas === 1) {
-          ctx.strokeStyle = '#3b2f2a';
-          ctx.lineWidth = Math.max(1.5, s * 0.08);
-          ctx.beginPath();
-          ctx.moveTo(px + ins + ww * 0.25, py + ins + ww * 0.1);
-          ctx.lineTo(px + ins + ww * 0.5, py + ins + ww * 0.45);
-          ctx.lineTo(px + ins + ww * 0.38, py + ins + ww * 0.6);
-          ctx.lineTo(px + ins + ww * 0.7, py + ins + ww * 0.9);
-          ctx.stroke();
-        }
-      }
       if (c.folha) {
         // folha seca por cima, na diagonal (a cor do pedacinho continua aparecendo nos cantos)
         ctx.save();
         ctx.translate(px + s / 2, py + s / 2);
         ctx.rotate(-Math.PI / 4);
-        ctx.fillStyle = 'rgba(176,124,38,0.86)';
-        ctx.strokeStyle = '#6e4a10';
-        ctx.lineWidth = Math.max(1, s * 0.05);
+        ctx.fillStyle = 'rgba(120,128,64,0.92)';
+        ctx.strokeStyle = '#2e2a1c';
+        ctx.lineWidth = Math.max(1.5, s * 0.09);
         ctx.beginPath();
         ctx.ellipse(0, 0, s * 0.4, s * 0.17, 0, 0, Math.PI * 2);
         ctx.fill();

@@ -7,7 +7,16 @@ const CHAVE = 'formigueiro:v1';
 export type Velocidade = 1 | 2 | 5;
 export type TelaSalva = 'inicio' | 'mapa' | 'jogo';
 
+/** Ajudas opcionais (ficam desligadas até a pessoa ligar em Ajustes). */
+export interface Ajudas {
+  /** 👁 N em cada formiga pronta + contorno nos pedacinhos que ela enxerga */
+  olho: boolean;
+  /** símbolo (●▲■…) em cada cor, para quem não distingue bem algumas cores */
+  simbolos: boolean;
+}
+
 export interface Progresso {
+  ajudas: Ajudas;
   ganhas: number[];
   faseAtual: number;
   velocidade: Velocidade;
@@ -16,7 +25,7 @@ export interface Progresso {
   tela: TelaSalva;
 }
 
-const PADRAO: Progresso = { ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
+const PADRAO: Progresso = { ajudas: { olho: false, simbolos: false }, ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
 
 let cache: Progresso | null = null;
 
@@ -24,9 +33,10 @@ export function progresso(): Progresso {
   if (cache) return cache;
   try {
     const bruto = localStorage.getItem(CHAVE);
-    cache = { ...PADRAO, ...(bruto ? JSON.parse(bruto) : {}) };
+    const lido = bruto ? JSON.parse(bruto) : {};
+    cache = { ...PADRAO, ...lido, ajudas: { ...PADRAO.ajudas, ...(lido.ajudas ?? {}) } };
   } catch {
-    cache = { ...PADRAO };
+    cache = { ...PADRAO, ajudas: { ...PADRAO.ajudas } };
   }
   return cache!;
 }

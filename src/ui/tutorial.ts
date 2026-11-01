@@ -1,6 +1,7 @@
 /** Como jogar: 5 passos curtos, "Pular" sempre visível. */
 import { PALETA } from '../fases/paleta.ts';
 import { formigaSvg, olhoSvg } from './formiga.ts';
+import { progresso } from './salvar.ts';
 
 const P = (i: number) => PALETA[i];
 
@@ -26,12 +27,12 @@ const ILUSTRACOES: string[] = [
   // 4: só o primeiro que ela vê (✗ no que não é da cor dela)
   `<div class="ilus"><div class="mini-tile peq" style="--c:${P(4).escura}">${formigaSvg(4)}<span class="n">3</span></div>
    <svg viewBox="0 0 290 70" width="290" height="70"><path d="M2 35h38" stroke="#3b2f2a" stroke-width="4" stroke-dasharray="2 8" stroke-linecap="round"/>
-   ${quad(50, 18, 0)}<g stroke="#fff" stroke-width="7" stroke-linecap="round"><path d="M60 28l16 16M76 28 60 44"/></g><g stroke="#3b2f2a" stroke-width="3.5" stroke-linecap="round"><path d="M60 28l16 16M76 28 60 44"/></g>
+   ${quad(50, 18, 0)}<g fill="none" stroke="#fff" stroke-width="8"><circle cx="68" cy="36" r="13"/><path d="M59 45 77 27"/></g><g fill="none" stroke="#c42a22" stroke-width="4"><circle cx="68" cy="36" r="13"/><path d="M59 45 77 27"/></g>
    ${quad(96, 18, 4, 34, 'opacity=".4"')}${quad(142, 18, 4, 34, 'opacity=".4"')}</svg></div>`,
   // 5: o número com olho
   `<div class="ilus"><div class="mini-tile" style="--c:${P(2).escura}">${formigaSvg(2)}<span class="n">12</span><span class="ol">${olhoSvg}7</span></div></div>`,
   // 6: a espera
-  `<div class="ilus col"><div class="espera tut">${[0, 1, 2, 3, 4].map((i) => (i < 2 ? `<div class="folha cheia" style="--e:56px">${i === 0 ? formigaSvg(6) : formigaSvg(1)}</div>` : `<div class="folha" style="--e:56px"></div>`)).join('')}</div></div>`,
+  `<div class="ilus col"><div class="espera tut">${[0, 1, 2, 3, 4].map((i) => (i < 2 ? `<div class="folha cheia" style="--e:68px">${i === 0 ? formigaSvg(6) : formigaSvg(1)}</div>` : `<div class="folha" style="--e:68px"></div>`)).join('')}</div></div>`,
 ];
 
 const PASSOS = [
@@ -44,15 +45,18 @@ const PASSOS = [
 ];
 
 export function montarTutorial(app: HTMLElement, aoFechar: () => void) {
+  // o passo do olho (índice 4) só aparece se a ajuda estiver ligada em Ajustes
+  const ordem = ILUSTRACOES.map((_, k) => k).filter((k) => k !== 4 || progresso().ajudas.olho);
   let i = 0;
   function desenhar() {
-    const ultimo = i === PASSOS.length - 1;
+    const ultimo = i === ordem.length - 1;
+    const k = ordem[i];
     app.innerHTML = `<div class="tutorial">
       <button class="btn pular" id="tPular">Pular</button>
-      <div class="passo-n">Passo ${i + 1} de ${PASSOS.length}</div>
-      ${ILUSTRACOES[i]}
-      <p class="texto-tut">${PASSOS[i]}</p>
-      <div class="pontos">${PASSOS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="passo-n">Passo ${i + 1} de ${ordem.length}</div>
+      ${ILUSTRACOES[k]}
+      <p class="texto-tut">${PASSOS[k]}</p>
+      <div class="pontos">${ordem.map((_, n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div>
       <div class="nav-tut">${i > 0 ? '<button class="btn" id="tVolta">‹ Voltar</button>' : ''}<button class="btn grande ambar" id="tProx">${ultimo ? 'Vamos jogar!' : 'Próximo ›'}</button></div>
     </div>`;
     app.querySelector('#tPular')!.addEventListener('click', aoFechar);

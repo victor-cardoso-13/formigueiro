@@ -1,16 +1,15 @@
 /**
- * TODAS as regras da casa de Formigueiro num lugar só, comentadas com exemplos.
- * Este arquivo não sabe que existe tela.
+ * TODAS as regras da casa de Formigueiro num lugar só. Este arquivo não sabe que existe tela.
  */
 export const REGRAS = {
-  /** Folhinhas de espera entre o desenho e o formigueiro. Encheu e sobrou formiga com fome = derrota. */
-  LUGARES_ESPERA: 5,
-  /** No máximo 5 formigas andando na trilha ao mesmo tempo (o 6º toque é ignorado). */
-  MAX_NA_TRILHA: 5,
-  /** Formiga dorminhoca acorda depois de 3 saídas do formigueiro (de qualquer coluna) depois que ela chegou à frente. */
-  SAIDAS_PARA_ACORDAR: 3,
-  /** Torrão duro: 2 mordidas da cor certa. */
-  MORDIDAS_TORRAO: 2,
-  /** Toques são guardados nas soluções como número: 0..4 = coluna; 10..14 = lugar de espera 0..4. */
-  BASE_ESPERA: 10,
+  /** Vagas onde os ninhos trabalham. Ninho ligado por cano ocupa 2 ou 3 vagas ao mesmo tempo. */
+  VAGAS: 5,
+  /** Passos entre uma formiga e a próxima saindo do mesmo ninho. */
+  ESPERA_ENTRE_FORMIGAS: 5,
+  /** Velocidade das formigas: larguras do quadro por passo. */
+  VELOCIDADE: 0.04,
+  /** Margem do caminho em volta do quadro (em larguras do quadro). */
+  MARGEM: 0.025,
+  /** Passos por segundo na velocidade 1× (2× e 3× multiplicam). */
+  PASSOS_POR_SEGUNDO: 30,
 } as const;

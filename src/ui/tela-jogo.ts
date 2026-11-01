@@ -66,7 +66,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
 
   // ---------- medidas (sem rolagem em nenhum tamanho) ----------
   const alturaBarra = (tt: number) => Math.max(24, Math.round(tt * 0.3));
-  const alturaColonia = (tt: number, sg: number) => tt + (sg + 1) * (alturaBarra(tt) + 3) + 34;
+  const maxSeg = Math.max(0, ...fase.colunas.map((c) => c.length - 1));
+  const alturaColonia = (tt: number, sg: number) => tt + (sg + (maxSeg > sg ? 1 : 0)) * (alturaBarra(tt) + 3) + 34;
   function ajustar() {
     const W = jogoEl.clientWidth;
     const H = jogoEl.clientHeight;
@@ -103,7 +104,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     // a altura do formigueiro é reservada (não pula quando as filas encolhem): ladrilho + barrinhas + linha do "+N" + montinho
     segs = 0;
     t = 48;
-    achou: for (const sg of [3, 2, 1, 0]) {
+    achou: for (const sg of [3, 2, 1, 0].filter((x) => x <= maxSeg || x === 0)) {
       for (let tt = Math.min(tw, 130); tt >= 48; tt -= 2) {
         if (alturaColonia(tt, sg) <= hCol) {
           if (tt >= Math.min(tw, 62) || sg === 0) {
@@ -148,11 +149,12 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     const aVista = new Set(pedacosAVista(e).map((p) => `${p.x},${p.y}`));
     // com muitas cores prontas o contorno viraria poluição: aí só a cor sob o dedo/mouse é destacada
     const coresProntas = new Set(prontas().map((f) => f.cor));
-    desenhar(cv, geo, e, { destacar: coresProntas.size <= 4 ? coresProntas : new Set(), aVista, foco });
+    const aj = progresso().ajudas;
+    desenhar(cv, geo, e, { destacar: aj.olho && coresProntas.size <= 4 ? coresProntas : new Set(), aVista: aj.olho ? aVista : new Set(), foco: aj.olho ? foco : null, simbolos: aj.simbolos });
   }
 
   // ---------- formigas na trilha ----------
-  const tamanhoFormiga = () => Math.max(geo.s * 1.5, 34);
+  const tamanhoFormiga = () => Math.max(geo.s * 1.5, 40);
   function centro(x: number, y: number) {
     return { cx: (x + 1.5) * geo.s, cy: (y + 1.5) * geo.s };
   }
@@ -248,10 +250,10 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           if (col.length === 0) return `<div class="col vazia"></div>`;
           const f = col[0];
           const dorme = !!f.dorme;
-          const p = dorme ? null : previsao(e, { coluna: i }).comeria;
+          const p = dorme || !progresso().ajudas.olho ? null : previsao(e, { coluna: i }).comeria;
           const seg = col
             .slice(1, 1 + segs)
-            .map((x) => `<div class="seg" style="--c:${PALETA[x.cor].cor};--d:${PALETA[x.cor].escura}">${simboloSvg(x.cor, PALETA[x.cor].cor, 15)}<span>${x.dorme ? 'zzz' : x.fome}</span></div>`)
+            .map((x) => `<div class="seg" style="--c:${PALETA[x.cor].cor};--d:${PALETA[x.cor].escura}">${progresso().ajudas.simbolos ? simboloSvg(x.cor, PALETA[x.cor].cor, 15) : ''}<span>${x.dorme ? 'zzz' : x.fome}</span></div>`)
             .join('');
           const mais = col.length - 1 > segs ? `<div class="mais">+${col.length - 1 - segs}</div>` : '';
           return `<div class="col" data-c="${i}" data-cor="${f.cor}"><button class="tile" aria-label="Formiga ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p)}</button>${seg}${mais}</div>`;
@@ -260,7 +262,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       elEspera.innerHTML = e.espera
         .map((f, j) => {
           if (!f) return `<div class="folha"></div>`;
-          const p = previsao(e, { espera: j }).comeria;
+          const p = progresso().ajudas.olho ? previsao(e, { espera: j }).comeria : null;
           return `<button class="folha cheia" data-e="${j}" data-cor="${f.cor}" aria-label="Formiga esperando, ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p, 'peq')}</button>`;
         })
         .join('');
@@ -312,8 +314,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   function aplicar(evs: Evento[]) {
     for (const ev of evs) {
       if (ev.tipo === 'comeu') {
-        const cor = ev.sumiu ? corDoEfeito(ev.id) : corDoEfeito(ev.id);
-        efeito(ev.x, ev.y, cor);
+        efeito(ev.x, ev.y, corDoEfeito(ev.id));
       } else if (ev.tipo === 'foiEmbora') sair(ev.id, 'foi');
       else if (ev.tipo === 'esperou') sair(ev.id, 'foi');
     }
@@ -358,12 +359,11 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       app.querySelector('#cFases')?.addEventListener('click', () => nav.irParaMapa());
       app.querySelector('#cDeNovo')?.addEventListener('click', recomecar);
     } else {
+      const temDesfazer = pilha.length > 0;
       mostrar(`<div class="cartao"><div class="festa">😟</div><h2>Perdeu</h2><p>${e.motivo ?? ''}</p>
-        <div class="acoes"><button class="btn grande ambar" id="cDesfazer">${ICONE_DESFAZER} Desfazer</button>
-        <button class="btn" id="cRecomecar">${ICONE_RECOMECAR} Recomeçar</button></div></div>`);
-      const d = app.querySelector<HTMLButtonElement>('#cDesfazer')!;
-      d.disabled = pilha.length === 0;
-      d.addEventListener('click', desfazer);
+        <div class="acoes">${temDesfazer ? `<button class="btn grande ambar" id="cDesfazer">${ICONE_DESFAZER} Desfazer</button>` : ''}
+        <button class="btn ${temDesfazer ? '' : 'grande ambar'}" id="cRecomecar">${ICONE_RECOMECAR} Recomeçar</button></div></div>`);
+      app.querySelector('#cDesfazer')?.addEventListener('click', desfazer);
       app.querySelector('#cRecomecar')?.addEventListener('click', recomecar);
     }
   }

@@ -39,28 +39,28 @@
 | 33 | dificil | Mandala | 18×18 | 6 | 4 | 25 | folha | 0.547 |
 | 34 | dificil | Espiral III | 18×18 | 6 | 4 | 27 | folha | 0.47 |
 | 35 | dificil | Quadrados | 16×16 | 6 | 4 | 15 | folha | 0.623 |
-| 36 | dificil | Cogumelo de retalhos | 20×18 | 6 | 4 | 21 | folha, duro | 0.75 |
-| 37 | dificil | Mosaico II | 18×18 | 6 | 4 | 23 | folha, duro | 0.433 |
-| 38 | dificil | Tijolinhos III | 20×16 | 6 | 4 | 28 | folha, duro | 0.387 |
-| 39 | dificil | Casinha de retalhos | 20×18 | 7 | 4 | 21 | folha, duro | 0.65 |
-| 40 | dificil | Xadrez III | 18×18 | 7 | 4 | 30 | folha, duro | 0.183 |
-| 41 | dificil | Gato de retalhos | 20×20 | 7 | 4 | 27 | folha, duro, dorminhoca | 0.383 |
-| 42 | dificil | Vitral IV | 18×18 | 7 | 4 | 25 | folha, duro, dorminhoca | 0.27 |
-| 43 | dificil | Círculos II | 20×20 | 7 | 4 | 23 | folha, duro, dorminhoca | 0.28 |
-| 44 | dificil | Espiral IV | 20×20 | 7 | 4 | 33 | folha, duro, dorminhoca | 0.137 |
-| 45 | dificil | Listras III | 20×16 | 7 | 4 | 30 | folha, duro, dorminhoca | 0.173 |
-| 46 | dificil | Mosaico III | 20×20 | 7 | 4 | 33 | folha, duro, dorminhoca | 0.153 |
-| 47 | dificil | Vitral V | 20×20 | 6 | 4 | 25 | folha, duro, dorminhoca | 0.34 |
-| 48 | dificil | Tijolinhos IV | 20×18 | 7 | 4 | 26 | folha, duro, dorminhoca | 0.143 |
-| 49 | dificil | Losangos II | 20×20 | 6 | 4 | 24 | folha, duro, dorminhoca | 0.17 |
-| 50 | dificil | Xadrez IV | 20×20 | 7 | 4 | 38 | folha, duro, dorminhoca | 0.113 |
-| 51 | muito-dificil | Barco de retalhos | 24×20 | 8 | 5 | 27 | folha, duro, dorminhoca | 0.177 |
-| 52 | muito-dificil | Vitral VI | 22×22 | 8 | 5 | 29 | folha, duro, dorminhoca | 0.073 |
-| 53 | muito-dificil | Espiral V | 22×22 | 8 | 5 | 34 | folha, duro, dorminhoca | 0.05 |
-| 54 | muito-dificil | Flor de retalhos | 18×22 | 8 | 5 | 23 | folha, duro, dorminhoca | 0.15 |
-| 55 | muito-dificil | Mosaico IV | 22×22 | 8 | 5 | 43 | folha, duro, dorminhoca | 0.037 |
-| 56 | muito-dificil | Árvore de retalhos | 18×22 | 8 | 5 | 20 | folha, duro, dorminhoca | 0.353 |
-| 57 | muito-dificil | Círculos III | 24×24 | 9 | 5 | 30 | folha, duro, dorminhoca | 0.033 |
-| 58 | muito-dificil | Vitral VII | 24×24 | 9 | 5 | 38 | folha, duro, dorminhoca | 0.027 |
-| 59 | muito-dificil | Tijolinhos V | 24×20 | 9 | 5 | 50 | folha, duro, dorminhoca | 0.037 |
-| 60 | muito-dificil | Espiral VI | 24×24 | 9 | 5 | 50 | folha, duro, dorminhoca | 0.02 |
+| 36 | dificil | Cogumelo de retalhos | 20×18 | 6 | 4 | 18 | folha | 0.68 |
+| 37 | dificil | Mosaico II | 18×18 | 6 | 4 | 22 | folha | 0.537 |
+| 38 | dificil | Tijolinhos III | 20×16 | 6 | 4 | 23 | folha | 0.287 |
+| 39 | dificil | Casinha de retalhos | 20×18 | 7 | 4 | 21 | folha | 0.633 |
+| 40 | dificil | Xadrez III | 18×18 | 7 | 4 | 25 | folha | 0.143 |
+| 41 | dificil | Gato de retalhos | 20×20 | 7 | 4 | 27 | folha, dorminhoca | 0.367 |
+| 42 | dificil | Vitral IV | 18×18 | 7 | 4 | 24 | folha, dorminhoca | 0.187 |
+| 43 | dificil | Círculos II | 20×20 | 7 | 4 | 24 | folha, dorminhoca | 0.197 |
+| 44 | dificil | Espiral IV | 20×20 | 7 | 4 | 30 | folha, dorminhoca | 0.063 |
+| 45 | dificil | Listras III | 20×16 | 7 | 4 | 27 | folha, dorminhoca | 0.143 |
+| 46 | dificil | Mosaico III | 20×20 | 7 | 4 | 33 | folha, dorminhoca | 0.143 |
+| 47 | dificil | Vitral V | 20×20 | 6 | 4 | 25 | folha, dorminhoca | 0.24 |
+| 48 | dificil | Tijolinhos IV | 20×18 | 7 | 4 | 32 | folha, dorminhoca | 0.3 |
+| 49 | dificil | Losangos II | 20×20 | 6 | 4 | 28 | folha, dorminhoca | 0.06 |
+| 50 | dificil | Xadrez IV | 20×20 | 7 | 4 | 32 | folha, dorminhoca | 0.153 |
+| 51 | muito-dificil | Barco de retalhos | 24×20 | 8 | 5 | 28 | folha, dorminhoca | 0.247 |
+| 52 | muito-dificil | Vitral VI | 22×22 | 8 | 5 | 34 | folha, dorminhoca | 0.047 |
+| 53 | muito-dificil | Espiral V | 22×22 | 8 | 5 | 38 | folha, dorminhoca | 0.073 |
+| 54 | muito-dificil | Flor de retalhos | 18×22 | 8 | 5 | 21 | folha, dorminhoca | 0.29 |
+| 55 | muito-dificil | Mosaico IV | 22×22 | 8 | 5 | 41 | folha, dorminhoca | 0.02 |
+| 56 | muito-dificil | Árvore de retalhos | 18×22 | 8 | 5 | 17 | folha, dorminhoca | 0.387 |
+| 57 | muito-dificil | Círculos III | 24×24 | 9 | 5 | 35 | folha, dorminhoca | 0.05 |
+| 58 | muito-dificil | Vitral VII | 24×24 | 9 | 5 | 39 | folha, dorminhoca | 0.007 |
+| 59 | muito-dificil | Tijolinhos V | 24×20 | 9 | 5 | 40 | folha, dorminhoca | 0.01 |
+| 60 | muito-dificil | Espiral VI | 24×24 | 9 | 5 | 41 | folha, dorminhoca | 0.023 |

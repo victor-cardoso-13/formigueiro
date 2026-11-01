@@ -2,7 +2,7 @@ import { PALETA } from '../fases/paleta.ts';
 import { formigaSvg } from './formiga.ts';
 import { progresso } from './salvar.ts';
 
-export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): void; ajuda(): void }) {
+export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): void; ajuda(): void; ajustes(): void }) {
   const p = progresso();
   const continua = p.ganhas.length > 0;
   app.innerHTML = `<div class="inicio">
@@ -13,11 +13,13 @@ export function montarInicio(app: HTMLElement, nav: { jogar(): void; mapa(): voi
       <button class="btn grande ambar" id="bJogar">${continua ? 'Continuar' : 'Jogar'}</button>
       <button class="btn grande" id="bMapa">Fases</button>
       <button class="btn grande" id="bAjuda">Como jogar</button>
+      <button class="btn grande" id="bAjustes">Ajustes</button>
     </div>
     <p class="rodape">Sem anúncios · ${p.ganhas.length} fases ganhas</p>
   </div>`;
   app.querySelector('#bJogar')!.addEventListener('click', nav.jogar);
   app.querySelector('#bMapa')!.addEventListener('click', nav.mapa);
   app.querySelector('#bAjuda')!.addEventListener('click', nav.ajuda);
+  app.querySelector('#bAjustes')!.addEventListener('click', nav.ajustes);
   void PALETA;
 }

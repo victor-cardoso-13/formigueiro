@@ -12,7 +12,7 @@ Português, linguagem simples, passo a passo (ele não programa). No fim, diga c
 - Um desenho de pixels feito de pedacinhos de açúcar coloridos; **formigas** coloridas, cada uma com uma **fome** (número),
   dão uma volta numa **trilha** em torno do desenho e comem **o primeiro pedacinho que veem** em cada linha/coluna, se for da cor delas.
 - 5 lugares de espera; encheu e sobrou formiga com fome = derrota. Desenho vazio = vitória.
-- Peças especiais: torrão duro (2 mordidas), folha seca (cai quando um vizinho é comido), formiga dorminhoca (acorda após 3 saídas).
+- Peças especiais: folha seca (cai quando um vizinho é comido), formiga dorminhoca (acorda após 3 saídas).
 - Ajudas: Desfazer (só com a trilha vazia), Recomeçar, velocidade 1×/2×/5×. Sem moedas/anúncios/poderes.
 - 60 fases **congeladas** em `src/fases/fases.json` (nunca gerar na hora; se regerar, troque a chave `formigueiro:v1`).
 - **Originalidade**: não imitar nenhum jogo comercial existente (tela, desenhos, peças, ajudas).
@@ -31,3 +31,6 @@ Português, linguagem simples, passo a passo (ele não programa). No fim, diga c
 
 ## Para testar no celular sem publicar
 `npx vite --host --port 5180` e abrir no celular (mesmo Wi-Fi) o endereço "Network". Ou dois cliques em `Jogar no computador.command`.
+
+## Decisão do Victor (1/nov)
+- **Sem torrão duro** (ele pediu para tirar do jogo). Os símbolos de cor e a "ajuda do olho" (👁 N e contorno) existem só em **Ajustes**, desligados por padrão.

@@ -55,11 +55,9 @@ Nada de "mistério": o jogador deve conseguir prever o que a formiga vai comer.
 - O tutorial tem um passo só para isso: "A formiga só come o primeiro pedacinho que ela vê na linha".
 
 7. Invariante das fases: para cada cor, **soma das fomes = número de pedacinhos daquela cor**
-   (contando 2 por "torrão duro", ver abaixo).
+
 
 ## Peças especiais (nossas) — entram aos poucos
-- **Torrão duro** (difícil+): pedacinho com brilho/rachadura; precisa de **2 mordidas** da cor certa
-  (a 1ª deixa rachado). Conta 2 na soma das fomes.
 - **Folha seca** (média+): uma folhinha em cima do pedacinho (a cor dele continua **visível** por baixo, nada fica
   escondido); **ninguém come** enquanto a folha estiver lá. A folha **cai quando um vizinho (cima/baixo/esquerda/direita) for comido**. Enquanto coberto,
   ele **tapa a visão** como um pedacinho normal.
@@ -82,7 +80,7 @@ Nada de "mistério": o jogador deve conseguir prever o que a formiga vai comer.
 |---|---|---|---|---|---|---|
 | Fácil | 1–10 | 8×8 a 12×12 | 2–3 | 2 | 4–20 | nenhum; folga grande (resolve quase de qualquer jeito) |
 | Média | 11–30 | 12×12 a 16×16 | 3–5 | 3 | 5–30 | folha seca a partir da 16 |
-| Difícil | 31–50 | 16×16 a 20×20 | 5–7 | 4 | 5–40 | folha seca, torrão duro (a partir da 36), dorminhoca (a partir da 41) |
+| Difícil | 31–50 | 16×16 a 20×20 | 5–7 | 4 | 5–40 | folha seca, dorminhoca (a partir da 41) |
 | Muito difícil | 51–60 | 20×20 a 24×24 | 7–9 | 5 | 5–50 | tudo junto, pouca folga |
 
 - A 1ª fase de cada peça especial é uma fase "de apresentação" com uma faixa curta explicando.

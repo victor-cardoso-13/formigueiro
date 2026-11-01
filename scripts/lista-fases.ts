@@ -6,8 +6,7 @@ import type { Entrada } from './gerador.ts';
 
 const FAIXAS: Record<number, string> = {
   16: 'Folha seca! Ninguém come o pedacinho debaixo da folha. Ela cai quando um vizinho (em cima, embaixo ou do lado) for comido.',
-  36: 'Torrão duro! Precisa de 2 mordidas da cor certa. Na primeira, ele racha.',
-  41: 'Formiga dorminhoca! Ela dorme (zzz) e não pode sair. Acorda depois que 3 formigas saírem das outras filas.',
+  41: 'Formiga dorminhoca! Ela dorme (zzz) e não pode sair. Acorda depois que 3 formigas saírem das filas.',
 };
 
 const pequeno = (nome: string) => DESENHOS_PEQUENOS.find((d) => d.nome === nome)!.linhas;
@@ -91,7 +90,7 @@ export function entradas(): Entrada[] {
       nome,
       linhas,
       semente: 1000 + id * 17,
-      especiais: { folha: id >= 16, duro: id >= 36, dorminhoca: dorm },
+      especiais: { folha: id >= 16, dorminhoca: dorm },
       faixa: FAIXAS[id],
       param: dorm ? { dorminhocas: id <= 45 ? 2 : id <= 50 ? 3 : 4 } : {},
     });

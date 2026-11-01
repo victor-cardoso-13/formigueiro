@@ -25,10 +25,10 @@ describe('fases congeladas', () => {
 
   for (const f of fases) {
     describe(`fase ${f.id} (${f.nome})`, () => {
-      it('soma das fomes de cada cor = pedacinhos da cor (torrão duro conta 2)', () => {
+      it('soma das fomes de cada cor = pedacinhos da cor ', () => {
         const e = novoEstado(f);
         const pedacos = new Map<number, number>();
-        for (const l of e.desenho) for (const c of l) if (c) pedacos.set(c.cor, (pedacos.get(c.cor) ?? 0) + c.mordidas);
+        for (const l of e.desenho) for (const c of l) if (c) pedacos.set(c.cor, (pedacos.get(c.cor) ?? 0) + 1);
         const fomes = new Map<number, number>();
         for (const col of f.colunas) for (const a of col) fomes.set(a.cor, (fomes.get(a.cor) ?? 0) + a.fome);
         expect([...fomes.entries()].sort()).toEqual([...pedacos.entries()].sort());
@@ -40,7 +40,7 @@ describe('fases congeladas', () => {
           expect(l.length).toBe(f.largura);
           for (const ch of l) if (ch !== '.') expect(parseInt(ch, 36)).toBeLessThan(PALETA.length);
         }
-        for (const [x, y] of [...f.folhas, ...f.duros]) expect(f.desenho[y][x]).not.toBe('.');
+        for (const [x, y] of f.folhas) expect(f.desenho[y][x]).not.toBe('.');
       });
 
       it('replay da solução (uma formiga por vez) termina em vitória', () => {
@@ -79,15 +79,12 @@ describe('peças especiais e faixas', () => {
     if (fases.length < 41) return;
     expect(por(16)?.especiais).toContain('folha');
     expect(por(16)?.faixa).toBeTruthy();
-    expect(por(36)?.especiais).toContain('duro');
-    expect(por(36)?.faixa).toBeTruthy();
     expect(por(41)?.especiais).toContain('dorminhoca');
     expect(por(41)?.faixa).toBeTruthy();
   });
   it('antes de cada peça nova, as fases não a usam', () => {
     for (const f of fases) {
       if (f.id < 16) expect(f.especiais).not.toContain('folha');
-      if (f.id < 36) expect(f.especiais).not.toContain('duro');
       if (f.id < 41) expect(f.especiais).not.toContain('dorminhoca');
     }
   });

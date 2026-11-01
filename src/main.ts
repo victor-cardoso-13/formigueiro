@@ -6,6 +6,7 @@ import './estilo.css';
 import fasesJson from './fases/fases.json';
 import type { Fase } from './motor/tipos.ts';
 import { montarInicio } from './ui/inicio.ts';
+import { montarAjustes } from './ui/ajustes.ts';
 import { montarMapa } from './ui/mapa.ts';
 import { esquecerTudoParaTeste, guardar, ganhou, liberada, progresso } from './ui/salvar.ts';
 import { montarJogo } from './ui/tela-jogo.ts';
@@ -18,6 +19,8 @@ let limpar: (() => void) | null = null;
 
 // Só para os prints e testes: ?limpo=1 começa do zero; ?todas=1 libera todas as fases.
 if (params.get('limpo')) esquecerTudoParaTeste();
+if (params.get('olho')) guardar({ ajudas: { ...progresso().ajudas, olho: true } });
+if (params.get('simbolos')) guardar({ ajudas: { ...progresso().ajudas, simbolos: true } });
 if (params.get('visto')) guardar({ tutorialVisto: true });
 if (params.get('todas')) for (const f of fases) ganhou(f.id);
 if (params.get('ganhas')) for (let i = 1; i <= Number(params.get('ganhas')); i++) ganhou(i);
@@ -32,7 +35,10 @@ function trocar(montar: () => (() => void) | void) {
 
 function inicio() {
   guardar({ tela: 'inicio' });
-  trocar(() => montarInicio(app, { jogar: () => jogar(proximaFase()), mapa, ajuda: () => tutorial(inicio) }));
+  trocar(() => montarInicio(app, { jogar: () => jogar(proximaFase()), mapa, ajuda: () => tutorial(inicio), ajustes }));
+}
+function ajustes() {
+  trocar(() => montarAjustes(app, inicio));
 }
 function mapa() {
   guardar({ tela: 'mapa' });
@@ -84,4 +90,5 @@ if (tela === 'tutorial') {
   for (let i = 0; i < n; i++) (app.querySelector('#tProx') as HTMLElement | null)?.click();
 } else if (tela === 'jogo') jogar(Number(params.get('fase') ?? progresso().faseAtual), params.get('demo') ?? undefined);
 else if (tela === 'mapa') mapa();
+else if (tela === 'ajustes') ajustes();
 else inicio();
