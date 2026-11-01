@@ -7,6 +7,7 @@ import { clonar, formigaEm, novoEstado, origemDe, passo, pedacosAVista, previsao
 import { REGRAS } from '../motor/regras.ts';
 import { trilha as geoTrilha } from '../motor/trilha.ts';
 import type { Estado, Evento, Fase, Formiga, Origem } from '../motor/tipos.ts';
+import { simboloSvg } from '../fases/simbolos.ts';
 import { formigaSvg, olhoSvg } from './formiga.ts';
 import { ganhou, guardar, progresso, type Velocidade } from './salvar.ts';
 import { desenhar, medir, type Geometria } from './tabuleiro.ts';
@@ -47,7 +48,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     <div class="botoes">
       <button class="btn" id="bDesfazer">${ICONE_DESFAZER} Desfazer</button>
       <button class="btn" id="bRecomecar">${ICONE_RECOMECAR} Recomeçar</button>
-      <button class="btn vel" id="bVel" aria-label="Velocidade da formiga"></button>
+      <button class="btn vel" id="bVel" aria-label="Velocidade da formiga: toque para mudar"></button>
     </div>
     <div class="cortina" id="cortina" hidden></div>
   </div>`;
@@ -64,6 +65,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   const nCol = fase.colunas.length;
 
   // ---------- medidas (sem rolagem em nenhum tamanho) ----------
+  const alturaBarra = (tt: number) => Math.max(24, Math.round(tt * 0.3));
+  const alturaColonia = (tt: number, sg: number) => tt + (sg + 1) * (alturaBarra(tt) + 3) + 34;
   function ajustar() {
     const W = jogoEl.clientWidth;
     const H = jogoEl.clientHeight;
@@ -71,7 +74,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     jogoEl.classList.toggle('paisagem', paisagem);
     const gap = 8;
     const razao = (fase.largura + 2) / (fase.altura + 2);
-    const eLado = Math.max(46, Math.min(84, Math.floor((paisagem ? W * 0.4 : W) / 5) - 10));
+    const eLado = Math.max(48, Math.min(84, Math.floor((paisagem ? W * 0.4 : W) / 5) - 10));
     jogoEl.style.setProperty('--e', `${eLado}px`);
     let boardW: number;
     let boardH: number;
@@ -97,19 +100,24 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       hCol = H - fixo - boardH;
     }
     const tw = Math.floor((wCol - (nCol - 1) * gap) / nCol) - 2;
+    // a altura do formigueiro é reservada (não pula quando as filas encolhem): ladrilho + barrinhas + linha do "+N" + montinho
     segs = 0;
-    t = Math.max(46, Math.min(tw, 54));
-    for (const s of [3, 2, 1, 0]) {
-      const tMax = Math.floor((hCol - 3 * s - 14) / (1 + 0.3 * s));
-      if (tMax >= Math.min(tw, 62) || s === 0) {
-        t = Math.max(46, Math.min(tw, 112, tMax));
-        segs = s;
-        break;
+    t = 48;
+    achou: for (const sg of [3, 2, 1, 0]) {
+      for (let tt = Math.min(tw, 130); tt >= 48; tt -= 2) {
+        if (alturaColonia(tt, sg) <= hCol) {
+          if (tt >= Math.min(tw, 62) || sg === 0) {
+            t = tt;
+            segs = sg;
+            break achou;
+          }
+          break;
+        }
       }
     }
     if (!paisagem) {
       // sobrou altura? o tabuleiro cresce dentro da largura
-      const sobra = hCol - (t + segs * (Math.round(t * 0.3) + 3) + 14);
+      const sobra = hCol - alturaColonia(t, segs);
       if (sobra > 0) {
         const maxH2 = boardH + sobra;
         boardW = Math.min(W, Math.floor(maxH2 * razao));
@@ -118,7 +126,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     }
     geo = medir(fase.largura, fase.altura, boardW, boardH);
     jogoEl.style.setProperty('--t', `${t}px`);
-    jogoEl.style.setProperty('--peek', `${Math.round(t * 0.3)}px`);
+    jogoEl.style.setProperty('--peek', `${alturaBarra(t)}px`);
+    jogoEl.style.setProperty('--colh', `${alturaColonia(t, segs)}px`);
     jogoEl.style.setProperty('--n', String(nCol));
     tab.style.width = `${geo.larguraPx}px`;
     tab.style.height = `${geo.alturaPx}px`;
@@ -137,11 +146,13 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   }
   function redesenhar() {
     const aVista = new Set(pedacosAVista(e).map((p) => `${p.x},${p.y}`));
-    desenhar(cv, geo, e, { destacar: new Set(prontas().map((f) => f.cor)), aVista, foco });
+    // com muitas cores prontas o contorno viraria poluição: aí só a cor sob o dedo/mouse é destacada
+    const coresProntas = new Set(prontas().map((f) => f.cor));
+    desenhar(cv, geo, e, { destacar: coresProntas.size <= 4 ? coresProntas : new Set(), aVista, foco });
   }
 
   // ---------- formigas na trilha ----------
-  const tamanhoFormiga = () => Math.max(geo.s * 1.5, 24);
+  const tamanhoFormiga = () => Math.max(geo.s * 1.5, 34);
   function centro(x: number, y: number) {
     return { cx: (x + 1.5) * geo.s, cy: (y + 1.5) * geo.s };
   }
@@ -162,7 +173,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     if (!r) {
       const el = document.createElement('div');
       el.className = 'fm-trilha';
-      el.innerHTML = formigaSvg(cor) + `<span class="fome-t"></span>`;
+      el.innerHTML = formigaSvg(cor, 'sem-simbolo') + `<span class="fome-t"></span>`;
       sobre.appendChild(el);
       r = { el, ang: alvoAng };
       elTrilha.set(id, r);
@@ -182,7 +193,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     alvoAng = r.ang;
     r.el.style.transform = `translate(${cx - a / 2}px, ${cy - a / 2}px) rotate(${alvoAng}deg)`;
     const lab = r.el.querySelector<HTMLElement>('.fome-t')!;
-    lab.textContent = a >= 26 ? String(fome) : '';
+    lab.textContent = String(fome);
     lab.style.transform = `rotate(${-alvoAng}deg)`;
   }
   function el_(el: HTMLElement, a: number) {
@@ -240,12 +251,10 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           const p = dorme ? null : previsao(e, { coluna: i }).comeria;
           const seg = col
             .slice(1, 1 + segs)
-            .map((s, j) => {
-              const ultimo = j === segs - 1 && col.length - 1 > segs;
-              return `<div class="seg" style="--c:${PALETA[s.cor].cor};--d:${PALETA[s.cor].escura}">${ultimo ? `+${col.length - 1 - j}` : s.dorme ? 'zzz' : s.fome}</div>`;
-            })
+            .map((x) => `<div class="seg" style="--c:${PALETA[x.cor].cor};--d:${PALETA[x.cor].escura}">${simboloSvg(x.cor, PALETA[x.cor].cor, 15)}<span>${x.dorme ? 'zzz' : x.fome}</span></div>`)
             .join('');
-          return `<div class="col" data-c="${i}" data-cor="${f.cor}"><button class="tile" aria-label="Formiga ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p)}</button>${seg}</div>`;
+          const mais = col.length - 1 > segs ? `<div class="mais">+${col.length - 1 - segs}</div>` : '';
+          return `<div class="col" data-c="${i}" data-cor="${f.cor}"><button class="tile" aria-label="Formiga ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p)}</button>${seg}${mais}</div>`;
         })
         .join('');
       elEspera.innerHTML = e.espera
@@ -267,8 +276,9 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       }
     }
     const podeDesfazer = pilha.length > 0 && (e.trilha.length === 0 || e.resultado !== 'jogando');
-    bDesfazer.disabled = !podeDesfazer;
-    bVel.textContent = `${vel}×`;
+    bDesfazer.classList.toggle('apagado', !podeDesfazer);
+    bDesfazer.setAttribute('aria-disabled', String(!podeDesfazer));
+    bVel.innerHTML = `<span class="vn">${vel}×</span><span class="vt">${vel === 1 ? 'Normal' : vel === 2 ? 'Rápido' : 'Turbo'}</span>`;
     jogoEl.style.setProperty('--ms', `${MS[vel]}ms`);
   }
   function mudarFoco(c: number | null) {
@@ -387,8 +397,25 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
 
   $('bFases').addEventListener('click', () => nav.irParaMapa());
   $('bAjuda').addEventListener('click', () => nav.abrirTutorial());
-  bDesfazer.addEventListener('click', desfazer);
-  $('bRecomecar').addEventListener('click', recomecar);
+  function aviso(texto: string) {
+    const el = document.createElement('div');
+    el.className = 'aviso';
+    el.textContent = texto;
+    jogoEl.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+  bDesfazer.addEventListener('click', () => {
+    if (e.resultado === 'jogando' && e.trilha.length > 0) return aviso('Espere as formigas pararem');
+    if (!pilha.length) return aviso('Ainda não há o que desfazer');
+    desfazer();
+  });
+  $('bRecomecar').addEventListener('click', () => {
+    if (e.passo === 0 && pilha.length === 0) return recomecar();
+    mostrar(`<div class="cartao"><h2>Recomeçar a fase?</h2><p>O que você já fez nesta fase se perde.</p>
+      <div class="acoes"><button class="btn grande ambar" id="cSim">Sim, recomeçar</button><button class="btn grande" id="cNao">Não</button></div></div>`);
+    app.querySelector('#cSim')!.addEventListener('click', recomecar);
+    app.querySelector('#cNao')!.addEventListener('click', () => (cortina.hidden = true));
+  });
   bVel.addEventListener('click', () => {
     vel = vel === 1 ? 2 : vel === 2 ? 5 : 1;
     guardar({ velocidade: vel });

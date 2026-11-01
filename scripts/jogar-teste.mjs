@@ -43,6 +43,7 @@ for (const id of [1, 9, 16, 36, 41, 60]) {
 }
 // o mapa deve mostrar a fase ganha e liberar a seguinte
 await page.goto(`http://localhost:${porta}/?tela=mapa`);
+await page.click('.aba[data-g="muito-dificil"]');
 const ganhas = await page.$$eval('.fase.ganha', (b) => b.length);
 console.log('fases ganhas no mapa:', ganhas);
 if (ganhas < 1) falhar('mapa não mostra as fases ganhas');

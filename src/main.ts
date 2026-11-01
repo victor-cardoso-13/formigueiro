@@ -46,6 +46,13 @@ function tutorial(depois: () => void) {
     }),
   );
 }
+/** "?" durante a partida: abre o tutorial por cima, sem desmontar o jogo (a partida continua de onde estava). */
+function tutorialPorCima() {
+  const camada = document.createElement('div');
+  camada.className = 'camada-tutorial';
+  document.body.appendChild(camada);
+  montarTutorial(camada, () => camada.remove());
+}
 function proximaFase(): number {
   const p = progresso();
   const f = fases.find((x) => !p.ganhas.includes(x.id) && liberada(x.id));
@@ -60,7 +67,7 @@ function jogar(id: number, demo?: string) {
       montarJogo(
         app,
         fase,
-        { irParaMapa: mapa, irParaFase: (n) => jogar(n), abrirTutorial: () => tutorial(() => jogar(id)), temProxima: (n) => fases.some((f) => f.id === n + 1) },
+        { irParaMapa: mapa, irParaFase: (n) => jogar(n), abrirTutorial: tutorialPorCima, temProxima: (n) => fases.some((f) => f.id === n + 1) },
         demo,
       ),
     );

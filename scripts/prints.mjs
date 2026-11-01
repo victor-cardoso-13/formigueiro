@@ -19,7 +19,12 @@ const cenas = {
   ganhou: '?limpo=1&visto=1&tela=jogo&fase=9&demo=ganhou',
   perdeu: '?limpo=1&visto=1&tela=jogo&fase=9&demo=perdeu',
   tutorial: '?limpo=1&tela=tutorial',
+  'tutorial-2': '?limpo=1&tela=tutorial&passo=1',
+  'tutorial-3': '?limpo=1&tela=tutorial&passo=2',
   'tutorial-4': '?limpo=1&tela=tutorial&passo=3',
+  'tutorial-5': '?limpo=1&tela=tutorial&passo=4',
+  'tutorial-6': '?limpo=1&tela=tutorial&passo=5',
+  'jogo-fase-41-comeco': '?limpo=1&visto=1&tela=jogo&fase=41',
 };
 const extras = (process.argv[5] ?? '').split(',').filter(Boolean); // cenas extras: nome=?query
 const so = process.argv[4]; // opcional: só uma cena

@@ -1,5 +1,6 @@
 /** Desenho SVG da formiga (cabecinha, antenas, corpo com a cor, perninhas). Olhando para cima. */
 import { PALETA } from '../fases/paleta.ts';
+import { SIMBOLOS, corDoSimbolo } from '../fases/simbolos.ts';
 
 export function formigaSvg(cor: number, extra = ''): string {
   const { cor: c, escura: e } = PALETA[cor];
@@ -8,6 +9,7 @@ export function formigaSvg(cor: number, extra = ''): string {
 <g fill="${c}" stroke="${e}" stroke-width="2.8"><ellipse cx="32" cy="50" rx="11" ry="12"/><ellipse cx="32" cy="33" rx="8" ry="8"/><circle cx="32" cy="18" r="9.5"/></g>
 <g stroke="${e}" stroke-width="1.6"><circle cx="28" cy="16" r="3.2" fill="#fff"/><circle cx="36" cy="16" r="3.2" fill="#fff"/></g>
 <circle cx="28.6" cy="15.6" r="1.4" fill="#222"/><circle cx="36.6" cy="15.6" r="1.4" fill="#222"/>
+${extra.includes('sem-simbolo') ? '' : `<g transform="translate(26 44) scale(1.2)"><path d="${SIMBOLOS[cor].d}" fill="${corDoSimbolo(c)}" ${SIMBOLOS[cor].furo ? 'fill-rule="evenodd"' : ''} stroke="${corDoSimbolo(c) === '#ffffff' ? e : '#fff'}" stroke-width=".6" paint-order="stroke"/></g>`}
 </svg>`;
 }
 

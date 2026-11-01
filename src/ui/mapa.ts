@@ -11,7 +11,7 @@ const GRUPOS: { id: Grupo; nome: string; cor: string }[] = [
 
 export function montarMapa(app: HTMLElement, fases: Fase[], nav: { jogar(id: number): void; inicio(): void }, grupoInicial?: Grupo) {
   const ganhas = new Set(progresso().ganhas);
-  const atual = progresso().faseAtual;
+  const atual = fases.find((f) => !ganhas.has(f.id) && liberada(f.id))?.id ?? progresso().faseAtual;
   let grupo: Grupo = grupoInicial ?? fases.find((f) => f.id === atual)?.grupo ?? 'facil';
   function desenhar() {
     const lista = fases.filter((f) => f.grupo === grupo);
