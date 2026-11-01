@@ -98,8 +98,8 @@ function pintarCelula(ctx: CanvasRenderingContext2D, m: Medidas, dpr: number, x:
     return;
   }
   const c = m.cel;
-  const g = Math.max(0.5, c * 0.05);
-  const raio = c * 0.2;
+  const g = Math.max(0.3, c * 0.015);
+  const raio = c * 0.15;
   // corpo do bloco = lado (escuro), por baixo
   ctx.fillStyle = LADO[cor];
   rr(ctx, r.x + g, r.y + g, r.w - 2 * g, r.h - 2 * g, raio);
