@@ -149,15 +149,15 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
 }
 .canos-vagas { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; overflow: visible; }
 
-/* ninhos: bloco 3D arredondado (face de cima + lado mais escuro), fio branco em volta, número grande */
+/* ninhos: bloco arredondado de cor uniforme (só um brilho leve em cima), fio branco em volta, número grande */
 .ninho-vaga, .ninho {
   --s: color-mix(in srgb, var(--c) 66%, #1d1a33);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 30%) 0 0 / 100% 76% no-repeat,
-    linear-gradient(180deg, var(--c) 0 76%, var(--s) 76% 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 34%) 0 0 / 100% 100% no-repeat,
+    var(--c);
   border: 2.5px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 0 0 2px var(--tinta-escura, #262340), 0 5px 4px rgba(20, 20, 50, 0.3);
-  display: grid; place-items: center; padding-bottom: 18%;
+  display: grid; place-items: center;
 }
 .ninho-vaga { position: absolute; inset: 0; border-radius: 16%; --vf: max(20px, calc(var(--vs) * 0.48)); }
 .ninho-vaga .n, .ninho .n { font-family: var(--titulo); font-weight: 700; line-height: 1.12; font-size: var(--vf); letter-spacing: 0.02em; }
@@ -174,7 +174,7 @@ html.modo-jogo body::before { background: linear-gradient(180deg, #6a70a0 0%, #6
 .zona-grade { position: relative; flex: none; }
 .grade { position: relative; }
 .canos { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; overflow: visible; }
-.ninho { position: absolute; z-index: 1; padding: 0 0 0; padding-bottom: calc(var(--nh) * 0.2); border-radius: 18px; }
+.ninho { position: absolute; z-index: 1; padding: 0; border-radius: 18px; }
 .ninho[hidden] { display: none; }
 .ninho.frente:active { transform: translateY(3px); }
 /* fileiras de trás: menores e esmaecidas (o número continua legível) */
