@@ -34,7 +34,9 @@ export interface Navegacao {
 }
 
 type Vel = 1 | 2 | 3;
-const NOME_VEL: Record<Vel, string> = { 1: 'Normal', 2: 'Rápido', 3: 'Turbo' };
+/** 1× é metade do ritmo antigo; 2× é o antigo normal; 3× segue turbo. */
+const MULT_VEL: Record<Vel, number> = { 1: 0.5, 2: 1, 3: 3 };
+const NOME_VEL: Record<Vel, string> = { 1: 'Lento', 2: 'Normal', 3: 'Turbo' };
 /** Marca "já viu o cartão do cano" em progresso().faixasVistas (não é número de fase). */
 const FAIXA_CANO = 9001;
 
@@ -236,7 +238,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     }
     const svg = canos
       ? `<svg class="canos" width="${nCol * cw + (nCol - 1) * CG}" height="${R * nh + (R - 1) * RG}" aria-hidden="true"><g fill="none" stroke-linejoin="round" stroke-linecap="butt">
-        <g stroke="#3b2f2a" stroke-width="${larg + 6}">${canos}</g><g stroke="#aab4bd" stroke-width="${larg}">${canos}</g><g stroke="#e6edf2" stroke-width="${Math.max(2, larg * 0.28)}" transform="translate(0 ${-larg * 0.22})">${canos}</g></g><g fill="#8a949c" stroke="#3b2f2a" stroke-width="3">${aneis}</g></svg>`
+        <g stroke="#b9a58f" stroke-width="${larg + 6}">${canos}</g><g stroke="#dccdb9" stroke-width="${larg}">${canos}</g><g stroke="#f1e8da" stroke-width="${Math.max(2, larg * 0.28)}" transform="translate(0 ${-larg * 0.22})">${canos}</g></g><g fill="#cdbba4" stroke="#b9a58f" stroke-width="3">${aneis}</g></svg>`
       : '';
     grade.innerHTML = svg + html;
     mais.textContent = escondidos > 0 ? `+${escondidos} atrás` : '';
@@ -353,7 +355,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           passos++;
         }
       } else {
-        acc += dt * REGRAS.PASSOS_POR_SEGUNDO * vel;
+        acc += dt * REGRAS.PASSOS_POR_SEGUNDO * MULT_VEL[vel];
         while (acc >= 1 && passos < 30 && e.resultado === 'jogando') {
           acc -= 1;
           for (const f of e.formigas) corDe.set(f.id, f.cor);
