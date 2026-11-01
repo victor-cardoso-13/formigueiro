@@ -197,6 +197,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   // ---------- grade de ninhos ----------
   const SIMB = () => progresso().ajudas.simbolos;
   function renderGrade() {
+    const frenteOk = new Set(frente(e).filter((n) => podeNaFrente(n.id)).map((n) => n.id));
     const colunas: Ninho[][] = [];
     for (let c = 0; c < nCol; c++) colunas.push(e.grade.map((l) => l[c]).filter((n): n is Ninho => !!n));
     const pos = new Map<number, { x: number; y: number; vis: boolean; grupo?: number }>();
@@ -210,7 +211,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
         const y = d * (nh + RG);
         pos.set(n.id, { x, y, vis, grupo: n.grupo });
         const simb = SIMB() ? `<span class="simb">${simboloSvg(n.cor, PALETA[n.cor].cor, Math.round(nh * 0.3))}</span>` : '';
-        html += `<button class="ninho ${d === 0 ? 'frente' : 'atras'}${d > 0 && d < R ? ' d' + d : ''}" data-id="${n.id}" data-len="${String(n.restam).length}" ${vis ? '' : 'hidden'}
+        html += `<button class="ninho ${d === 0 && frenteOk.has(n.id) ? 'frente' : 'atras'}${d > 0 && d < R ? ' d' + d : ''}${d === 0 && !frenteOk.has(n.id) ? ' preso' : ''}" data-id="${n.id}" data-len="${String(n.restam).length}" ${vis ? '' : 'hidden'}
           style="left:${x}px;top:${y}px;width:${cw}px;height:${nh}px;${estiloCor(n.cor)}"
           aria-label="Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas">${simb}<span class="n">${n.restam}</span></button>`;
       }),
@@ -234,7 +235,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       }
     }
     const svg = canos
-      ? `<svg class="canos" width="${nCol * (cw + CG)}" height="${R * (nh + RG)}" aria-hidden="true"><g fill="none" stroke-linejoin="round" stroke-linecap="butt">
+      ? `<svg class="canos" width="${nCol * cw + (nCol - 1) * CG}" height="${R * nh + (R - 1) * RG}" aria-hidden="true"><g fill="none" stroke-linejoin="round" stroke-linecap="butt">
         <g stroke="#3b2f2a" stroke-width="${larg + 6}">${canos}</g><g stroke="#aab4bd" stroke-width="${larg}">${canos}</g><g stroke="#e6edf2" stroke-width="${Math.max(2, larg * 0.28)}" transform="translate(0 ${-larg * 0.22})">${canos}</g></g><g fill="#8a949c" stroke="#3b2f2a" stroke-width="3">${aneis}</g></svg>`
       : '';
     grade.innerHTML = svg + html;
@@ -314,8 +315,22 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   }
 
   // ---------- o laço de animação ----------
+  let pausado = false;
+  const pausar = () => (pausado = true);
+  const retomar = () => {
+    pausado = false;
+    acordar();
+  };
+  window.addEventListener('formigueiro:pausa', pausar);
+  window.addEventListener('formigueiro:retomar', retomar);
+  /** O ninho está na frente E os ligados a ele por cano também. */
+  function podeNaFrente(id: number): boolean {
+    const un = unidade(e, id) ?? [];
+    const fr = new Set(frente(e).map((n) => n.id));
+    return un.every((n) => fr.has(n.id));
+  }
   function ativo(): boolean {
-    return e.resultado === 'jogando' && cortina.hidden === true && faixa.hidden === true;
+    return !pausado && e.resultado === 'jogando' && cortina.hidden === true && faixa.hidden === true;
   }
   function acordar() {
     if (raf) return;
@@ -398,8 +413,9 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       return aviso('Faltam vagas livres');
     }
     if (motivo === 'atras') {
-      tremer([id]);
-      return aviso('Use os ninhos da frente');
+      const un = unidade(e, id) ?? [];
+      tremer(un.map((n) => n.id));
+      return aviso(un.length > 1 ? 'Este cano está ligado a um ninho que ainda está atrás' : 'Use os ninhos da frente');
     }
     if (motivo) return;
     const de = new Map<number, DOMRect>();
@@ -482,6 +498,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   $('bAjuda').addEventListener('click', () => nav.abrirTutorial());
   bDesfazer.addEventListener('click', desfazer);
   $('bRecomecar').addEventListener('click', () => {
+    if (e.resultado !== 'jogando') return;
     if (!pilha.length) return recomecar();
     mostrar(`<div class="cartao"><h2>Recomeçar a fase?</h2><p>O que você fez nesta fase se perde.</p>
       <div class="acoes"><button class="btn grande ambar" id="cSim">Sim, recomeçar</button><button class="btn grande" id="cNao">Não</button></div></div>`);
@@ -551,5 +568,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     window.clearTimeout(fimTimer);
     window.clearTimeout(avisoTimer);
     window.removeEventListener('resize', aoRedimensionar);
+    window.removeEventListener('formigueiro:pausa', pausar);
+    window.removeEventListener('formigueiro:retomar', retomar);
   };
 }

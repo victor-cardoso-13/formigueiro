@@ -14,4 +14,3 @@ ${extra.includes('sem-simbolo') || !progresso().ajudas.simbolos ? '' : `<g trans
 </svg>`;
 }
 
-export const olhoSvg = `<svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>`;

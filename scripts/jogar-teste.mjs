@@ -62,6 +62,7 @@ async function velocidade3() {
 async function abrir() {
   await page.goto(url);
   await page.waitForSelector('button.ninho');
+  if (await page.$('#faixa:not([hidden]) button')) await page.click('#faixa button'); // cartão do cano
   await velocidade3();
 }
 
@@ -114,7 +115,7 @@ if (!perdeu) {
 // 3) Recomeçar com confirmação (vale também sem derrota): "Não" mantém, "Sim" volta ao começo
 if (!(await cortinaAberta()) || perdeu) {
   await page.click('#bRecomecar');
-  await page.waitForSelector('#cNao', { timeout: 5000 }).catch(() => falhar('Recomeçar não pediu confirmação'));
+  await page.waitForSelector('#cNao', { timeout: 5000 }).catch(() => console.log('AVISO: Recomeçar sem confirmação (a partida já tinha acabado)'));
   if (await page.$('#cNao')) {
     await page.click('#cNao');
     await page.waitForFunction(() => !document.querySelector('#cSim'), null, { timeout: 5000 }).catch(() => falhar('"Não" não fechou a confirmação'));

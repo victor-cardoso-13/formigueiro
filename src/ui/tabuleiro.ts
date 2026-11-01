@@ -237,7 +237,7 @@ function desenharFormiga(ctx: CanvasRenderingContext2D, x: number, y: number, an
 export function desenharCamada(canvas: HTMLCanvasElement, m: Medidas, formigas: Formiga[], particulas: Particula[], frac: number, agora: number) {
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, m.Wt, m.Ht);
-  const L = m.W * 0.054;
+  const L = Math.max(m.W * 0.054, 22);
   for (const f of formigas) {
     const total = f.acumulado[f.acumulado.length - 1];
     const prog = Math.min(total, f.prog + frac * REGRAS.VELOCIDADE);

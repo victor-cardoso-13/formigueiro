@@ -67,7 +67,11 @@ function tutorialPorCima() {
   const camada = document.createElement('div');
   camada.className = 'camada-tutorial';
   document.body.appendChild(camada);
-  montarTutorial(camada, () => camada.remove());
+  window.dispatchEvent(new Event('formigueiro:pausa'));
+  montarTutorial(camada, () => {
+    camada.remove();
+    window.dispatchEvent(new Event('formigueiro:retomar'));
+  });
 }
 function proximaFase(): number {
   const p = progresso();

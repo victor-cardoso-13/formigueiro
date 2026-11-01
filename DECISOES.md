@@ -1,3 +1,5 @@
+> **Leia primeiro:** o jogo foi refeito em 1/nov (estilo Colony Flow). Só a seção "Refeito em 1/nov" vale; o que vem antes dela descreve o jogo ANTIGO e está obsoleto.
+
 # Decisões tomadas sozinho (madrugada, Victor dormindo)
 
 - **Motor:** as funções (`tocar`, `passo`…) mexem no estado recebido; `clonar()` serve para guardar o "antes" (Desfazer).

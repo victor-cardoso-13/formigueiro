@@ -199,7 +199,7 @@ function verificarFim(e: Estado, eventos: Evento[]) {
     eventos.push({ tipo: 'vitoria' });
   } else if (e.formigas.length === 0 && !algumNinhoPodeSair(e) && !algumToqueValido(e)) {
     e.resultado = 'derrota';
-    e.motivo = 'As vagas estão cheias e nenhum ninho consegue pegar quadradinhos';
+    e.motivo = vagasLivres(e) > 0 ? 'Não há vagas livres para os ninhos ligados por cano' : 'As vagas estão cheias e nenhum ninho consegue pegar quadradinhos';
     eventos.push({ tipo: 'derrota', motivo: e.motivo });
   }
 }
