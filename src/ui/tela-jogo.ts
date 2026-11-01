@@ -1,16 +1,30 @@
 /**
- * A tela do jogo: tabuleiro (canvas), formigas andando (HTML por cima), lugares de espera, formigueiro e botões.
- * Liga os toques às regras do motor (src/motor) e anima um passo do motor por vez (120/60/24 ms).
+ * A tela do jogo: arena (quadro + buraco + 5 vagas, formigas num canvas por cima), grade de ninhos e botões.
+ * Todo o movimento vem do motor (src/motor): a tela só chama `passo(e)` no ritmo certo e desenha o que aconteceu.
  */
 import { PALETA } from '../fases/paleta.ts';
-import { clonar, formigaEm, novoEstado, origemDe, passo, pedacosAVista, previsao, rodarAteParar, tocar } from '../motor/jogo.ts';
-import { REGRAS } from '../motor/regras.ts';
-import { trilha as geoTrilha } from '../motor/trilha.ts';
-import type { Estado, Evento, Fase, Formiga, Origem } from '../motor/tipos.ts';
 import { simboloSvg } from '../fases/simbolos.ts';
-import { formigaSvg, olhoSvg } from './formiga.ts';
-import { ganhou, guardar, progresso, type Velocidade } from './salvar.ts';
-import { desenhar, medir, type Geometria } from './tabuleiro.ts';
+import { clonar, frente, motivoDeNaoPoder, novoEstado, parado, passo, rodarAteParar, tocar, unidade } from '../motor/colonia.ts';
+import { buraco, centroVaga } from '../motor/geometria.ts';
+import { REGRAS } from '../motor/regras.ts';
+import type { Estado, Evento, Fase, Ninho } from '../motor/tipos.ts';
+import { ganhou, guardar, progresso } from './salvar.ts';
+import {
+  apagarCelula,
+  desenharCamada,
+  desenharQuadro,
+  ehClara,
+  limparCamada,
+  medir,
+  prepararCanvas,
+  px,
+  py,
+  razaoArena,
+  razaoLargura,
+  soltarPoeira,
+  type Medidas,
+  type Particula,
+} from './tabuleiro.ts';
 
 export interface Navegacao {
   irParaMapa(): void;
@@ -19,407 +33,468 @@ export interface Navegacao {
   temProxima(id: number): boolean;
 }
 
-const MS: Record<Velocidade, number> = { 1: 120, 2: 60, 5: 24 };
-const ICONE_DESFAZER = `<svg class="ic" viewBox="0 0 24 24" width="22" height="22"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
-const ICONE_RECOMECAR = `<svg class="ic" viewBox="0 0 24 24" width="22" height="22"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>`;
+type Vel = 1 | 2 | 3;
+const NOME_VEL: Record<Vel, string> = { 1: 'Normal', 2: 'Rápido', 3: 'Turbo' };
+/** Marca "já viu o cartão do cano" em progresso().faixasVistas (não é número de fase). */
+const FAIXA_CANO = 9001;
+
+const ICONE_DESFAZER = `<svg class="ic" viewBox="0 0 24 24" width="24" height="24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+const ICONE_RECOMECAR = `<svg class="ic" viewBox="0 0 24 24" width="24" height="24"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>`;
+
+function lerVelocidade(): Vel {
+  const v = Number(progresso().velocidade);
+  return v === 2 ? 2 : v >= 3 ? 3 : 1;
+}
+
+/** Variáveis CSS de cor de um ninho (número escuro em cor clara, branco em cor escura). */
+function estiloCor(cor: number): string {
+  const { cor: c, escura } = PALETA[cor];
+  const clara = ehClara(c);
+  return `--c:${c};--d:${escura};--tc:${clara ? '#3b2f2a' : '#fff'};--ts:${clara ? '#fff' : '#3b2f2a'}`;
+}
 
 export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: string): () => void {
   let e: Estado = novoEstado(fase);
   const pilha: Estado[] = [];
-  let vel: Velocidade = progresso().velocidade;
-  let timer = 0;
-  let foco: number | null = null;
-  let geo: Geometria;
-  let t = 64;
-  let segs = 3;
-  let assinatura = '';
-  const elTrilha = new Map<number, { el: HTMLElement; ang: number }>();
+  let vel: Vel = lerVelocidade();
+  const R = Math.min(3, fase.grade.length); // linhas de ninhos que aparecem
+  const nCol = Math.max(1, ...fase.grade.map((l) => l.length));
+  const temCano = fase.grade.some((l) => l.some((n) => n && n.g !== undefined));
+  const corDe = new Map<number, number>(); // formiga -> cor
+  const particulas: Particula[] = [];
+  let m: Medidas = medir(fase.largura, fase.altura, 200);
+  // medidas da grade (px)
+  let nh = 56;
+  let cw = 100;
+  let CG = 16;
+  let RG = 8;
+  let raf = 0;
+  let ultimo = 0;
+  let acc = 0;
+  let verificar = false;
+  let fimTimer = 0;
+  let fimMostrado = false;
+  let avisoTimer = 0;
 
   app.innerHTML = `
-  <div class="jogo">
+  <div class="jogo" id="jogo">
     <div class="topo">
-      <button class="btn" id="bFases" aria-label="Voltar para as fases">${'☰'} Fases</button>
+      <button class="btn" id="bFases" aria-label="Voltar para as fases">☰ Fases</button>
       <h2>Fase ${fase.id} · ${fase.nome}</h2>
       <button class="btn redondo" id="bAjuda" aria-label="Como jogar">?</button>
     </div>
-    <div class="palco"><div class="tab" id="tab"><canvas id="cv"></canvas><div class="sobre" id="sobre"></div></div></div>
-    <div class="espera" id="espera"></div>
-    <div class="colonia" id="colonia"></div>
+    <div class="palco">
+      <div class="arena" id="arena">
+        <div class="chao" id="chao"></div>
+        <canvas id="cvQuadro"></canvas>
+        <div class="buraco" id="buraco"><i></i></div>
+        ${Array.from({ length: REGRAS.VAGAS }, () => `<div class="vaga"></div>`).join('')}
+        <canvas id="cvFormigas"></canvas>
+      </div>
+    </div>
+    <div class="zona-grade" id="zonaGrade">
+      <div class="grade" id="grade"></div>
+      <div class="mais" id="mais"></div>
+    </div>
     <div class="botoes">
       <button class="btn" id="bDesfazer">${ICONE_DESFAZER} Desfazer</button>
       <button class="btn" id="bRecomecar">${ICONE_RECOMECAR} Recomeçar</button>
-      <button class="btn vel" id="bVel" aria-label="Velocidade da formiga: toque para mudar"></button>
+      <button class="btn vel" id="bVel" aria-label="Velocidade das formigas: toque para mudar"></button>
     </div>
     <div class="cortina" id="cortina" hidden></div>
+    <div class="cortina" id="faixa" hidden></div>
   </div>`;
   const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!;
-  const jogoEl = app.querySelector<HTMLElement>('.jogo')!;
-  const tab = $('tab');
-  const cv = $<HTMLCanvasElement>('cv');
-  const sobre = $('sobre');
-  const elEspera = $('espera');
-  const elColonia = $('colonia');
+  const jogoEl = $('jogo');
+  const arena = $('arena');
+  const chao = $('chao');
+  const cvQuadro = $<HTMLCanvasElement>('cvQuadro');
+  const cvFormigas = $<HTMLCanvasElement>('cvFormigas');
+  const buracoEl = $('buraco');
+  const vagasEl = [...arena.querySelectorAll<HTMLElement>('.vaga')];
+  const zonaGrade = $('zonaGrade');
+  const grade = $('grade');
+  const mais = $('mais');
   const bDesfazer = $<HTMLButtonElement>('bDesfazer');
   const bVel = $<HTMLButtonElement>('bVel');
   const cortina = $('cortina');
-  const nCol = fase.colunas.length;
+  const faixa = $('faixa');
 
   // ---------- medidas (sem rolagem em nenhum tamanho) ----------
-  const alturaBarra = (tt: number) => Math.max(24, Math.round(tt * 0.3));
-  const maxSeg = Math.max(0, ...fase.colunas.map((c) => c.length - 1));
-  const alturaColonia = (tt: number, sg: number) => tt + (sg + (maxSeg > sg ? 1 : 0)) * (alturaBarra(tt) + 3) + 34;
   function ajustar() {
-    const W = jogoEl.clientWidth;
-    const H = jogoEl.clientHeight;
-    const paisagem = W > H * 1.1;
-    jogoEl.classList.toggle('paisagem', paisagem);
-    const gap = 8;
-    const razao = (fase.largura + 2) / (fase.altura + 2);
-    const eLado = Math.max(48, Math.min(84, Math.floor((paisagem ? W * 0.4 : W) / 5) - 10));
-    jogoEl.style.setProperty('--e', `${eLado}px`);
-    let boardW: number;
-    let boardH: number;
-    let hCol: number;
-    let wCol: number;
-    const topo = paisagem ? 48 : 52;
-    const botoes = 58;
-    const espera = eLado + 16;
+    const Wj = jogoEl.clientWidth;
+    const Hj = jogoEl.clientHeight;
+    const grande = Math.min(Wj, Hj) >= 600;
+    const paisagem = Wj > Hj * 1.1;
+    const bh = grande ? 58 : 52;
+    const gap = 10;
+    RG = grande ? 10 : 8;
+    CG = grande ? 24 : 16;
+    const pill = 26;
+    const cand = grande ? [96, 88, 80, 72, 64, 58] : [66, 62, 58, 54, 50, 48];
+    const alturaGrade = (n: number) => R * n + (R - 1) * RG + pill;
+    const raz = razaoArena(m.h);
+    let W: number;
+    let larguraGrade: number;
     if (paisagem) {
-      const lado = Math.min(H, Math.floor(W * 0.56));
-      boardW = Math.min(lado, Math.floor(H * razao));
-      boardH = Math.floor(boardW / razao);
-      jogoEl.style.gridTemplateColumns = `${lado}px minmax(0, 1fr)`;
-      wCol = W - lado - 14;
-      hCol = H - topo - botoes - espera - 40;
+      W = Math.min(Hj / raz, (Wj * 0.52) / razaoLargura);
+      const dir = Wj - W * razaoLargura - 16;
+      const disp = Hj - 2 * bh - 2 * gap;
+      nh = cand.find((n) => alturaGrade(n) <= disp) ?? cand[cand.length - 1];
+      larguraGrade = dir;
+      jogoEl.style.gridTemplateColumns = `${Math.floor(W * razaoLargura)}px minmax(0, 1fr)`;
     } else {
-      const fixo = topo + botoes + espera + 40;
-      const maxH = H - fixo - 120;
-      boardW = Math.min(W, Math.floor(maxH * razao));
-      boardH = Math.floor(boardW / razao);
-      jogoEl.style.gridTemplateColumns = 'minmax(0, 1fr)';
-      wCol = W;
-      hCol = H - fixo - boardH;
-    }
-    const tw = Math.floor((wCol - (nCol - 1) * gap) / nCol) - 2;
-    // a altura do formigueiro é reservada (não pula quando as filas encolhem): ladrilho + barrinhas + linha do "+N" + montinho
-    segs = 0;
-    t = 48;
-    achou: for (const sg of [3, 2, 1, 0].filter((x) => x <= maxSeg || x === 0)) {
-      for (let tt = Math.min(tw, 130); tt >= 48; tt -= 2) {
-        if (alturaColonia(tt, sg) <= hCol) {
-          if (tt >= Math.min(tw, 62) || sg === 0) {
-            t = tt;
-            segs = sg;
-            break achou;
-          }
+      const Wmax = Wj / razaoLargura;
+      const disp = Hj - 2 * bh - 3 * gap;
+      nh = cand[cand.length - 1];
+      W = Math.min(Wmax, (disp - alturaGrade(nh)) / raz);
+      for (const n of cand) {
+        const w = Math.min(Wmax, (disp - alturaGrade(n)) / raz);
+        if (w >= 0.72 * Wmax) {
+          nh = n;
+          W = w;
           break;
         }
       }
+      larguraGrade = Wj;
+      jogoEl.style.gridTemplateColumns = 'minmax(0, 1fr)';
     }
-    if (!paisagem) {
-      // sobrou altura? o tabuleiro cresce dentro da largura
-      const sobra = hCol - alturaColonia(t, segs);
-      if (sobra > 0) {
-        const maxH2 = boardH + sobra;
-        boardW = Math.min(W, Math.floor(maxH2 * razao));
-        boardH = Math.floor(boardW / razao);
-      }
-    }
-    geo = medir(fase.largura, fase.altura, boardW, boardH);
-    jogoEl.style.setProperty('--t', `${t}px`);
-    jogoEl.style.setProperty('--peek', `${alturaBarra(t)}px`);
-    jogoEl.style.setProperty('--colh', `${alturaColonia(t, segs)}px`);
-    jogoEl.style.setProperty('--n', String(nCol));
-    tab.style.width = `${geo.larguraPx}px`;
-    tab.style.height = `${geo.alturaPx}px`;
-    assinatura = '';
-    redesenhar();
-    desenharFormigasTrilha(true);
-    renderTudo();
+    W = Math.max(120, Math.floor(W));
+    const maxCw = grande ? 180 : 132;
+    const gw = Math.min(larguraGrade, nCol * maxCw + (nCol - 1) * CG);
+    cw = Math.floor((gw - (nCol - 1) * CG) / nCol);
+    jogoEl.classList.toggle('paisagem', paisagem);
+    jogoEl.classList.toggle('grande', grande);
+    jogoEl.style.setProperty('--bh', `${bh}px`);
+    jogoEl.style.setProperty('--nh', `${nh}px`);
+    m = medir(fase.largura, fase.altura, W);
+    // arena
+    arena.style.width = `${m.Wt}px`;
+    arena.style.height = `${m.Ht}px`;
+    const vs = m.W * 0.19;
+    jogoEl.style.setProperty('--vs', `${vs}px`);
+    chao.style.cssText = `left:${px(m, -0.04)}px;top:${py(m, m.h + 0.075)}px;width:${m.W * 1.08}px;height:${m.Ht - py(m, m.h + 0.075) - m.base * 0.5}px`;
+    const bu = buraco(m.h);
+    const bw = m.W * 0.24;
+    buracoEl.style.cssText = `left:${px(m, bu.x) - bw / 2}px;top:${py(m, bu.y) - bw * 0.27}px;width:${bw}px;height:${bw * 0.54}px`;
+    vagasEl.forEach((v, i) => {
+      const c = centroVaga(m.h, i);
+      v.style.cssText = `left:${px(m, c.x) - vs / 2}px;top:${py(m, c.y) - vs / 2}px;width:${vs}px;height:${vs}px`;
+    });
+    prepararCanvas(cvFormigas, m.Wt, m.Ht);
+    desenharQuadro(cvQuadro, m, e.desenho);
+    // grade (altura reservada: não pula quando as filas encolhem)
+    zonaGrade.style.width = `${gw}px`;
+    zonaGrade.style.height = `${alturaGrade(nh)}px`;
+    grade.style.width = `${gw}px`;
+    grade.style.height = `${R * nh + (R - 1) * RG}px`;
+    renderGrade();
+    sincVagas(true);
+    atualizarBotoes();
+    desenharCamada(cvFormigas, m, e.formigas, particulas, 0, performance.now());
   }
 
-  // ---------- desenho ----------
-  function prontas(): Formiga[] {
-    const l: Formiga[] = [];
-    for (const c of e.colunas) if (c[0] && !c[0].dorme) l.push(c[0]);
-    for (const f of e.espera) if (f) l.push(f);
-    return l;
-  }
-  function redesenhar() {
-    const aVista = new Set(pedacosAVista(e).map((p) => `${p.x},${p.y}`));
-    // com muitas cores prontas o contorno viraria poluição: aí só a cor sob o dedo/mouse é destacada
-    const coresProntas = new Set(prontas().map((f) => f.cor));
-    const aj = progresso().ajudas;
-    desenhar(cv, geo, e, { destacar: aj.olho && coresProntas.size <= 4 ? coresProntas : new Set(), aVista: aj.olho ? aVista : new Set(), foco: aj.olho ? foco : null, simbolos: aj.simbolos });
-  }
-
-  // ---------- formigas na trilha ----------
-  const tamanhoFormiga = () => Math.max(geo.s * 1.5, 40);
-  function centro(x: number, y: number) {
-    return { cx: (x + 1.5) * geo.s, cy: (y + 1.5) * geo.s };
-  }
-  function anguloDe(pos: number) {
-    const g = geoTrilha(e.largura, e.altura);
-    const a = g[pos];
-    const b = g[(pos + 1) % g.length];
-    const dx = Math.sign(b.x - a.x);
-    const dy = Math.sign(b.y - a.y);
-    return dx === 1 ? 90 : dx === -1 ? 270 : dy === 1 ? 180 : 0;
-  }
-  function posicionar(id: number, pos: number, fome: number, cor: number, de?: { cx: number; cy: number }) {
-    const a = tamanhoFormiga();
-    let r = elTrilha.get(id);
-    const g = geoTrilha(e.largura, e.altura)[pos];
-    const { cx, cy } = centro(g.x, g.y);
-    let alvoAng = anguloDe(pos);
-    if (!r) {
-      const el = document.createElement('div');
-      el.className = 'fm-trilha';
-      el.innerHTML = formigaSvg(cor, 'sem-simbolo') + `<span class="fome-t"></span>`;
-      sobre.appendChild(el);
-      r = { el, ang: alvoAng };
-      elTrilha.set(id, r);
-      el.style.width = el.style.height = `${a}px`;
-      el.style.fontSize = `${a * 0.9}px`;
-      if (de) {
-        el.style.transition = 'none';
-        el.style.transform = `translate(${de.cx - a / 2}px, ${de.cy - a / 2}px) rotate(${alvoAng}deg)`;
-        void el.offsetWidth;
-        el.style.transition = 'transform 240ms ease-out';
-      }
-    } else {
-      el_(r.el, a);
-    }
-    const delta = ((alvoAng - r.ang + 540) % 360) - 180;
-    r.ang += delta;
-    alvoAng = r.ang;
-    r.el.style.transform = `translate(${cx - a / 2}px, ${cy - a / 2}px) rotate(${alvoAng}deg)`;
-    const lab = r.el.querySelector<HTMLElement>('.fome-t')!;
-    lab.textContent = String(fome);
-    lab.style.transform = `rotate(${-alvoAng}deg)`;
-  }
-  function el_(el: HTMLElement, a: number) {
-    el.style.width = el.style.height = `${a}px`;
-    el.style.transition = ''; // volta para a transição do CSS (1 passo por vez, linear)
-  }
-  function desenharFormigasTrilha(refazer = false) {
-    if (refazer) {
-      for (const r of elTrilha.values()) r.el.remove();
-      elTrilha.clear();
-    }
-    for (const ft of e.trilha) posicionar(ft.formiga.id, ft.pos, ft.formiga.fome, ft.formiga.cor);
-  }
-  function sair(id: number, classe: string) {
-    const r = elTrilha.get(id);
-    if (!r) return;
-    elTrilha.delete(id);
-    r.el.classList.add(classe);
-    setTimeout(() => r.el.remove(), 320);
-  }
-  function efeito(x: number, y: number, cor: number) {
-    const { cx, cy } = centro(x, y);
-    const d = document.createElement('div');
-    d.className = 'nhac';
-    const s = geo.s;
-    d.style.cssText = `left:${cx - s / 2}px;top:${cy - s / 2}px;width:${s}px;height:${s}px;background:${PALETA[cor].cor}`;
-    sobre.appendChild(d);
-    setTimeout(() => d.remove(), 320);
-  }
-
-  // ---------- formigueiro e espera ----------
-  function ladrilho(f: Formiga, previa: number | null, extra = ''): string {
-    const { escura } = PALETA[f.cor];
-    const dorme = f.dorme && f.dorme > 0;
-    return `<div class="f ${dorme ? 'dorme' : ''} ${extra}" style="--c:${escura}">
-      ${formigaSvg(f.cor)}
-      <span class="n">${f.fome}</span>
-      ${dorme ? `<span class="zz">zzz ${f.dorme}</span>` : previa !== null ? `<span class="ol ${previa === 0 ? 'zero' : ''}">${olhoSvg}${previa}</span>` : ''}
-    </div>`;
-  }
-  function renderTudo() {
-    const parar = e.resultado === 'jogando';
-    const pods = new Map<number, number>();
-    for (const f of prontas()) pods.set(f.id, 0);
-    const chaveCols = e.colunas.map((c) => c.map((f) => `${f.id}:${f.fome}:${f.dorme ?? 0}`).join(',')).join('|');
-    const chaveEsp = e.espera.map((f) => (f ? `${f.id}:${f.fome}` : '-')).join(',');
-    const chave = `${chaveCols}#${chaveEsp}#${e.pedacos}#${parar}#${t}#${segs}`;
-    if (chave !== assinatura) {
-      assinatura = chave;
-      elColonia.innerHTML = e.colunas
-        .map((col, i) => {
-          if (col.length === 0) return `<div class="col vazia"></div>`;
-          const f = col[0];
-          const dorme = !!f.dorme;
-          const p = dorme || !progresso().ajudas.olho ? null : previsao(e, { coluna: i }).comeria;
-          const seg = col
-            .slice(1, 1 + segs)
-            .map((x) => `<div class="seg" style="--c:${PALETA[x.cor].cor};--d:${PALETA[x.cor].escura}">${progresso().ajudas.simbolos ? simboloSvg(x.cor, PALETA[x.cor].cor, 15) : ''}<span>${x.dorme ? 'zzz' : x.fome}</span></div>`)
-            .join('');
-          const mais = col.length - 1 > segs ? `<div class="mais">+${col.length - 1 - segs}</div>` : '';
-          return `<div class="col" data-c="${i}" data-cor="${f.cor}"><button class="tile" aria-label="Formiga ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p)}</button>${seg}${mais}</div>`;
-        })
-        .join('');
-      elEspera.innerHTML = e.espera
-        .map((f, j) => {
-          if (!f) return `<div class="folha"></div>`;
-          const p = progresso().ajudas.olho ? previsao(e, { espera: j }).comeria : null;
-          return `<button class="folha cheia" data-e="${j}" data-cor="${f.cor}" aria-label="Formiga esperando, ${PALETA[f.cor].nome}, fome ${f.fome}">${ladrilho(f, p, 'peq')}</button>`;
-        })
-        .join('');
-      for (const b of app.querySelectorAll<HTMLElement>('[data-c] .tile, [data-e]')) {
-        const pai = b.closest<HTMLElement>('[data-c], [data-e]')!;
-        const o: Origem = pai.dataset.c !== undefined ? { coluna: Number(pai.dataset.c) } : { espera: Number(pai.dataset.e) };
-        b.addEventListener('pointerdown', (ev) => {
-          ev.preventDefault();
-          tocarOrigem(o, b);
-        });
-        b.addEventListener('pointerenter', () => mudarFoco(Number(pai.dataset.cor)));
-        b.addEventListener('pointerleave', () => mudarFoco(null));
+  // ---------- grade de ninhos ----------
+  const SIMB = () => progresso().ajudas.simbolos;
+  function renderGrade() {
+    const colunas: Ninho[][] = [];
+    for (let c = 0; c < nCol; c++) colunas.push(e.grade.map((l) => l[c]).filter((n): n is Ninho => !!n));
+    const pos = new Map<number, { x: number; y: number; vis: boolean; grupo?: number }>();
+    let escondidos = 0;
+    let html = '';
+    colunas.forEach((col, c) =>
+      col.forEach((n, d) => {
+        const vis = d < R;
+        if (!vis) escondidos++;
+        const x = c * (cw + CG);
+        const y = d * (nh + RG);
+        pos.set(n.id, { x, y, vis, grupo: n.grupo });
+        const simb = SIMB() ? `<span class="simb">${simboloSvg(n.cor, PALETA[n.cor].cor, Math.round(nh * 0.3))}</span>` : '';
+        html += `<button class="ninho ${d === 0 ? 'frente' : 'atras'}${d > 0 && d < R ? ' d' + d : ''}" data-id="${n.id}" data-len="${String(n.restam).length}" ${vis ? '' : 'hidden'}
+          style="left:${x}px;top:${y}px;width:${cw}px;height:${nh}px;${estiloCor(n.cor)}"
+          aria-label="Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas">${simb}<span class="n">${n.restam}</span></button>`;
+      }),
+    );
+    // canos entre os ninhos ligados
+    const porGrupo = new Map<number, { x: number; y: number }[]>();
+    for (const p of pos.values()) if (p.vis && p.grupo !== undefined) porGrupo.set(p.grupo, [...(porGrupo.get(p.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh / 2 }]);
+    let canos = '';
+    let aneis = '';
+    const larg = Math.round(nh * 0.28);
+    for (const pts of porGrupo.values()) {
+      pts.sort((a, b) => a.x - b.x);
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        const mx = (a.x + b.x) / 2;
+        const ea = a.x + cw / 2 - cw * 0.2; // o cano entra um pouco em cada ninho
+        const eb = b.x - cw / 2 + cw * 0.2;
+        canos += `<path d="M${ea} ${a.y}H${mx}V${b.y}H${eb}"/>`;
+        for (const [ax, ay] of [[a.x + cw / 2, a.y], [b.x - cw / 2, b.y]]) aneis += `<rect x="${ax - 5}" y="${ay - larg / 2 - 5}" width="10" height="${larg + 10}" rx="4"/>`;
       }
     }
-    const podeDesfazer = pilha.length > 0 && (e.trilha.length === 0 || e.resultado !== 'jogando');
-    bDesfazer.classList.toggle('apagado', !podeDesfazer);
-    bDesfazer.setAttribute('aria-disabled', String(!podeDesfazer));
-    bVel.innerHTML = `<span class="vn">${vel}×</span><span class="vt">${vel === 1 ? 'Normal' : vel === 2 ? 'Rápido' : 'Turbo'}</span>`;
-    jogoEl.style.setProperty('--ms', `${MS[vel]}ms`);
+    const svg = canos
+      ? `<svg class="canos" width="${nCol * (cw + CG)}" height="${R * (nh + RG)}" aria-hidden="true"><g fill="none" stroke-linejoin="round" stroke-linecap="butt">
+        <g stroke="#3b2f2a" stroke-width="${larg + 6}">${canos}</g><g stroke="#aab4bd" stroke-width="${larg}">${canos}</g><g stroke="#e6edf2" stroke-width="${Math.max(2, larg * 0.28)}" transform="translate(0 ${-larg * 0.22})">${canos}</g></g><g fill="#8a949c" stroke="#3b2f2a" stroke-width="3">${aneis}</g></svg>`
+      : '';
+    grade.innerHTML = svg + html;
+    mais.textContent = escondidos > 0 ? `+${escondidos} atrás` : '';
   }
-  function mudarFoco(c: number | null) {
-    if (foco === c) return;
-    foco = c;
-    redesenhar();
+
+  // ---------- vagas (ninhos subidos) ----------
+  function criarNinhoVaga(i: number, n: Ninho, de?: DOMRect): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'ninho-vaga';
+    el.dataset.id = String(n.id);
+    el.dataset.len = String(String(n.restam).length);
+    el.style.cssText = estiloCor(n.cor);
+    el.innerHTML = `${SIMB() ? `<span class="simb">${simboloSvg(n.cor, PALETA[n.cor].cor, 13)}</span>` : ''}<span class="n">${n.restam}</span>`;
+    vagasEl[i].appendChild(el);
+    if (de) {
+      const para = el.getBoundingClientRect();
+      const dx = de.left + de.width / 2 - (para.left + para.width / 2);
+      const dy = de.top + de.height / 2 - (para.top + para.height / 2);
+      const s = Math.max(0.6, Math.min(2, de.height / para.height));
+      el.style.zIndex = '8';
+      el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: 'translate(0, 0) scale(1)' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.3,1)' }).finished.then(
+        () => (el.style.zIndex = ''),
+        () => undefined,
+      );
+    }
+    return el;
+  }
+  function sincVagas(forcar = false) {
+    vagasEl.forEach((v, i) => {
+      if (forcar) v.replaceChildren();
+      const n = e.vagas[i];
+      const atual = v.querySelector<HTMLElement>('.ninho-vaga:not(.saindo)');
+      if (!n) {
+        atual?.remove();
+        return;
+      }
+      if (!atual || atual.dataset.id !== String(n.id)) {
+        atual?.remove();
+        criarNinhoVaga(i, n);
+        return;
+      }
+      const num = atual.querySelector<HTMLElement>('.n')!;
+      const txt = String(n.restam);
+      if (num.textContent !== txt) {
+        num.textContent = txt;
+        atual.dataset.len = String(txt.length);
+        num.animate([{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 160 });
+      }
+    });
+  }
+
+  // ---------- eventos do motor ----------
+  function aplicar(evs: Evento[]) {
+    const agora = performance.now();
+    for (const ev of evs) {
+      if (ev.tipo === 'pegou') {
+        apagarCelula(cvQuadro, m, ev.x, ev.y);
+        const cx = m.pad + (ev.x + 0.5) * m.cel;
+        const cy = m.pad + (ev.y + 0.5) * m.cel;
+        soltarPoeira(particulas, cx, cy, corDe.get(ev.formiga) ?? 0, Math.max(5, m.W * 0.03), agora, 5, -1);
+      } else if (ev.tipo === 'entregou') {
+        const b = buraco(m.h);
+        soltarPoeira(particulas, px(m, b.x), py(m, b.y), corDe.get(ev.formiga) ?? 0, Math.max(4, m.W * 0.022), agora, 3, -1);
+        buracoEl.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.14, 0.9)' }, { transform: 'scale(1)' }], { duration: 200 });
+      } else if (ev.tipo === 'ninhoVazio') {
+        const el = vagasEl[ev.vaga].querySelector<HTMLElement>(`.ninho-vaga[data-id="${ev.id}"]`);
+        if (el) {
+          el.classList.add('saindo');
+          el.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0.2)', opacity: 0 }], { duration: 260, easing: 'ease-in' }).finished.then(
+            () => el.remove(),
+            () => el.remove(),
+          );
+        }
+      }
+    }
+  }
+
+  // ---------- o laço de animação ----------
+  function ativo(): boolean {
+    return e.resultado === 'jogando' && cortina.hidden === true && faixa.hidden === true;
+  }
+  function acordar() {
+    if (raf) return;
+    ultimo = performance.now();
+    raf = requestAnimationFrame(quadro);
+  }
+  function quadro(agora: number) {
+    raf = 0;
+    const dt = Math.min(0.1, Math.max(0, (agora - ultimo) / 1000));
+    ultimo = agora;
+    let passos = 0;
+    if (ativo()) {
+      if (parado(e)) {
+        acc = 0;
+        // o motor só decide a derrota dentro de `passo`: depois de um toque, dá um passo para ele conferir
+        if (verificar) {
+          verificar = false;
+          for (const f of e.formigas) corDe.set(f.id, f.cor);
+          aplicar(passo(e));
+          passos++;
+        }
+      } else {
+        acc += dt * REGRAS.PASSOS_POR_SEGUNDO * vel;
+        while (acc >= 1 && passos < 30 && e.resultado === 'jogando') {
+          acc -= 1;
+          for (const f of e.formigas) corDe.set(f.id, f.cor);
+          aplicar(passo(e));
+          passos++;
+        }
+        if (passos >= 30) acc = 0;
+      }
+    }
+    if (passos) sincVagas();
+    if (e.resultado !== 'jogando' && !fimMostrado) agendarFim();
+    const andando = ativo() && !parado(e);
+    desenharCamada(cvFormigas, m, e.formigas, particulas, andando ? Math.min(acc, 1) : 0, performance.now());
+    if ((ativo() && (!parado(e) || verificar)) || particulas.length > 0) raf = requestAnimationFrame(quadro);
+    else limparSePreciso();
+  }
+  function limparSePreciso() {
+    if (!e.formigas.length) limparCamada(cvFormigas, m);
+  }
+
+  // ---------- botões e avisos ----------
+  function atualizarBotoes() {
+    const pode = pilha.length > 0;
+    bDesfazer.classList.toggle('apagado', !pode);
+    bDesfazer.setAttribute('aria-disabled', String(!pode));
+    bVel.innerHTML = `<span class="vn">${vel}×</span><span class="vt">${NOME_VEL[vel]}</span>`;
+  }
+  function aviso(texto: string) {
+    jogoEl.querySelector('.aviso')?.remove();
+    window.clearTimeout(avisoTimer);
+    const el = document.createElement('div');
+    el.className = 'aviso';
+    el.textContent = texto;
+    const j = jogoEl.getBoundingClientRect();
+    const z = zonaGrade.getBoundingClientRect();
+    el.style.left = `${z.left - j.left + z.width / 2}px`;
+    el.style.top = `${z.top - j.top + z.height * 0.66}px`;
+    jogoEl.appendChild(el);
+    avisoTimer = window.setTimeout(() => el.remove(), 2200);
+  }
+  function tremer(ids: number[]) {
+    for (const id of ids) {
+      const b = grade.querySelector<HTMLElement>(`.ninho[data-id="${id}"]`);
+      if (!b) continue;
+      b.classList.remove('treme');
+      void b.offsetWidth;
+      b.classList.add('treme');
+    }
   }
 
   // ---------- jogar ----------
-  function tocarOrigem(o: Origem, el: HTMLElement) {
-    if (e.resultado !== 'jogando' || !cortina.hidden) return;
-    const f = formigaEm(e, o);
-    const retang = el.getBoundingClientRect();
-    const tr = tab.getBoundingClientRect();
-    const de = { cx: retang.left + retang.width / 2 - tr.left, cy: retang.top + retang.height / 2 - tr.top };
-    const antes = e.trilha.length === 0 ? clonar(e) : null;
-    const ev = tocar(e, o);
-    if (!ev) {
-      el.classList.remove('treme');
-      void el.offsetWidth;
-      el.classList.add('treme');
-      return;
+  function tocarNinho(id: number) {
+    if (e.resultado !== 'jogando' || !cortina.hidden || !faixa.hidden) return;
+    const motivo = motivoDeNaoPoder(e, id);
+    if (motivo === 'vagas') {
+      tremer((unidade(e, id) ?? []).map((n) => n.id));
+      return aviso('Faltam vagas livres');
     }
-    if (antes) pilha.push(antes);
-    if (f) posicionar(f.id, 0, f.fome, f.cor, de);
-    aplicar(ev);
-    renderTudo();
-    redesenhar();
-    agendar();
-  }
-  function aplicar(evs: Evento[]) {
-    for (const ev of evs) {
-      if (ev.tipo === 'comeu') {
-        efeito(ev.x, ev.y, corDoEfeito(ev.id));
-      } else if (ev.tipo === 'foiEmbora') sair(ev.id, 'foi');
-      else if (ev.tipo === 'esperou') sair(ev.id, 'foi');
+    if (motivo === 'atras') {
+      tremer([id]);
+      return aviso('Use os ninhos da frente');
     }
+    if (motivo) return;
+    const de = new Map<number, DOMRect>();
+    for (const n of unidade(e, id) ?? []) {
+      const b = grade.querySelector<HTMLElement>(`.ninho[data-id="${n.id}"]`);
+      if (b) de.set(n.id, b.getBoundingClientRect());
+    }
+    pilha.push(clonar(e));
+    const evs = tocar(e, id)!;
+    for (const ev of evs) if (ev.tipo === 'subiu') criarNinhoVaga(ev.vaga, e.vagas[ev.vaga]!, de.get(ev.id));
+    renderGrade();
+    atualizarBotoes();
+    verificar = true;
+    acordar();
   }
-  const cores = new Map<number, number>();
-  for (const col of e.colunas) for (const f of col) cores.set(f.id, f.cor);
-  const corDoEfeito = (id: number) => cores.get(id) ?? 0;
+  grade.addEventListener('pointerdown', (ev) => {
+    const b = (ev.target as HTMLElement).closest<HTMLElement>('.ninho');
+    if (!b) return;
+    ev.preventDefault();
+    tocarNinho(Number(b.dataset.id));
+  });
 
-  function agendar() {
-    if (timer || e.resultado !== 'jogando' || e.trilha.length === 0) return;
-    timer = window.setTimeout(passoUI, MS[vel]);
+  function refazerTudo() {
+    window.clearTimeout(fimTimer);
+    fimMostrado = false;
+    cortina.hidden = true;
+    particulas.length = 0;
+    acc = 0;
+    corDe.clear();
+    desenharQuadro(cvQuadro, m, e.desenho);
+    renderGrade();
+    sincVagas(true);
+    atualizarBotoes();
+    desenharCamada(cvFormigas, m, e.formigas, particulas, 0, performance.now());
+    acordar();
   }
-  function passoUI() {
-    timer = 0;
-    const antesPedacos = e.pedacos;
-    const evs = passo(e);
-    aplicar(evs);
-    desenharFormigasTrilha();
-    const mudou = e.pedacos !== antesPedacos || evs.some((x) => x.tipo === 'folhaCaiu' || x.tipo === 'comeu');
-    if (mudou) redesenhar();
-    if (evs.length) renderTudo();
-    if (e.resultado !== 'jogando') return terminar();
-    agendar();
-    if (e.trilha.length === 0) {
-      renderTudo();
-      redesenhar();
-    }
+  function desfazer() {
+    if (!pilha.length) return aviso('Nada para desfazer');
+    e = pilha.pop()!;
+    verificar = false;
+    refazerTudo();
+  }
+  function recomecar() {
+    e = novoEstado(fase);
+    pilha.length = 0;
+    verificar = false;
+    refazerTudo();
   }
 
-  function terminar() {
-    renderTudo();
-    redesenhar();
-    if (e.resultado === 'vitoria') {
-      ganhou(fase.id);
-      for (const r of elTrilha.values()) r.el.remove();
-      elTrilha.clear();
-      const tem = nav.temProxima(fase.id);
-      mostrar(`<div class="cartao"><div class="festa">🎉</div><h2>Ganhou!</h2><p>Os pedacinhos acabaram.</p>
-        <div class="acoes">${tem ? `<button class="btn grande ambar" id="cProxima">Próxima fase ›</button>` : ''}
-        <button class="btn" id="cFases">Fases</button><button class="btn" id="cDeNovo">Jogar de novo</button></div></div>`);
-      app.querySelector('#cProxima')?.addEventListener('click', () => nav.irParaFase(fase.id + 1));
-      app.querySelector('#cFases')?.addEventListener('click', () => nav.irParaMapa());
-      app.querySelector('#cDeNovo')?.addEventListener('click', recomecar);
-    } else {
-      const temDesfazer = pilha.length > 0;
-      mostrar(`<div class="cartao"><div class="festa">😟</div><h2>Perdeu</h2><p>${e.motivo ?? ''}</p>
-        <div class="acoes">${temDesfazer ? `<button class="btn grande ambar" id="cDesfazer">${ICONE_DESFAZER} Desfazer</button>` : ''}
-        <button class="btn ${temDesfazer ? '' : 'grande ambar'}" id="cRecomecar">${ICONE_RECOMECAR} Recomeçar</button></div></div>`);
-      app.querySelector('#cDesfazer')?.addEventListener('click', desfazer);
-      app.querySelector('#cRecomecar')?.addEventListener('click', recomecar);
-    }
-  }
   function mostrar(html: string) {
     cortina.innerHTML = html;
     cortina.hidden = false;
   }
-
-  function desfazer() {
-    if (!pilha.length || (e.trilha.length && e.resultado === 'jogando')) return;
-    e = pilha.pop()!;
-    window.clearTimeout(timer);
-    timer = 0;
-    cortina.hidden = true;
-    desenharFormigasTrilha(true);
-    assinatura = '';
-    renderTudo();
-    redesenhar();
+  function terminar() {
+    if (e.resultado === 'vitoria') {
+      const tem = nav.temProxima(fase.id);
+      mostrar(`<div class="cartao"><div class="festa">🎉</div><h2>Ganhou!</h2><p>Os quadradinhos acabaram.</p>
+        <div class="acoes">${tem ? `<button class="btn grande ambar" id="cProxima">Próxima fase ›</button>` : ''}
+        <button class="btn" id="cFases">Fases</button><button class="btn" id="cDeNovo">Jogar de novo</button></div></div>`);
+      cortina.querySelector('#cProxima')?.addEventListener('click', () => nav.irParaFase(fase.id + 1));
+      cortina.querySelector('#cFases')!.addEventListener('click', () => nav.irParaMapa());
+      cortina.querySelector('#cDeNovo')!.addEventListener('click', recomecar);
+    } else {
+      const temDesfazer = pilha.length > 0;
+      mostrar(`<div class="cartao"><div class="festa">😟</div><h2>Perdeu</h2><p>As vagas encheram.</p>
+        <div class="acoes">${temDesfazer ? `<button class="btn grande ambar" id="cDesfazer">${ICONE_DESFAZER} Desfazer</button>` : ''}
+        <button class="btn ${temDesfazer ? '' : 'grande ambar'}" id="cRecomecar">${ICONE_RECOMECAR} Recomeçar</button></div></div>`);
+      cortina.querySelector('#cDesfazer')?.addEventListener('click', desfazer);
+      cortina.querySelector('#cRecomecar')!.addEventListener('click', recomecar);
+    }
   }
-  function recomecar() {
-    window.clearTimeout(timer);
-    timer = 0;
-    e = novoEstado(fase);
-    pilha.length = 0;
-    cortina.hidden = true;
-    desenharFormigasTrilha(true);
-    assinatura = '';
-    renderTudo();
-    redesenhar();
+  function agendarFim(imediato = false) {
+    fimMostrado = true;
+    if (e.resultado === 'vitoria') ganhou(fase.id);
+    if (imediato) return terminar();
+    fimTimer = window.setTimeout(terminar, e.resultado === 'vitoria' ? 700 : 500);
   }
 
   $('bFases').addEventListener('click', () => nav.irParaMapa());
   $('bAjuda').addEventListener('click', () => nav.abrirTutorial());
-  function aviso(texto: string) {
-    const el = document.createElement('div');
-    el.className = 'aviso';
-    el.textContent = texto;
-    jogoEl.appendChild(el);
-    setTimeout(() => el.remove(), 2200);
-  }
-  bDesfazer.addEventListener('click', () => {
-    if (e.resultado === 'jogando' && e.trilha.length > 0) return aviso('Espere as formigas pararem');
-    if (!pilha.length) return aviso('Ainda não há o que desfazer');
-    desfazer();
-  });
+  bDesfazer.addEventListener('click', desfazer);
   $('bRecomecar').addEventListener('click', () => {
-    if (e.passo === 0 && pilha.length === 0) return recomecar();
-    mostrar(`<div class="cartao"><h2>Recomeçar a fase?</h2><p>O que você já fez nesta fase se perde.</p>
+    if (!pilha.length) return recomecar();
+    mostrar(`<div class="cartao"><h2>Recomeçar a fase?</h2><p>O que você fez nesta fase se perde.</p>
       <div class="acoes"><button class="btn grande ambar" id="cSim">Sim, recomeçar</button><button class="btn grande" id="cNao">Não</button></div></div>`);
-    app.querySelector('#cSim')!.addEventListener('click', recomecar);
-    app.querySelector('#cNao')!.addEventListener('click', () => (cortina.hidden = true));
+    cortina.querySelector('#cSim')!.addEventListener('click', recomecar);
+    cortina.querySelector('#cNao')!.addEventListener('click', () => {
+      cortina.hidden = true;
+      acordar();
+    });
   });
   bVel.addEventListener('click', () => {
-    vel = vel === 1 ? 2 : vel === 2 ? 5 : 1;
+    vel = vel === 1 ? 2 : vel === 2 ? 3 : 1;
     guardar({ velocidade: vel });
-    renderTudo();
+    atualizarBotoes();
   });
   const aoRedimensionar = () => ajustar();
   window.addEventListener('resize', aoRedimensionar);
@@ -428,46 +503,53 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   if (location.search.includes('teste=1')) (window as unknown as { __formigueiro: unknown }).__formigueiro = { estado: () => e };
 
   // ---------- começo ----------
-  ajustar();
-  if (demo) aplicarDemo(demo);
-  else if (fase.faixa && !progresso().faixasVistas.includes(fase.id)) {
-    mostrar(`<div class="cartao"><div class="festa">✨</div><h2>Novidade!</h2><p class="faixa">${fase.faixa}</p><button class="btn grande ambar" id="cEntendi">Entendi</button></div>`);
-    app.querySelector('#cEntendi')!.addEventListener('click', () => {
-      guardar({ faixasVistas: [...progresso().faixasVistas, fase.id] });
-      cortina.hidden = true;
-    });
-  }
-
-  /** Só para os prints: deixa a fase no meio, ganha ou perdida. */
+  /** Só para os prints: deixa a fase no meio, ganha, perdida ou com ninhos nas vagas. */
   function aplicarDemo(d: string) {
     const sol = fase.solucao;
-    const feitos = d === 'ganhou' ? sol.length : Math.floor(sol.length * 0.45);
+    const tocaveis = () => frente(e).filter((n) => motivoDeNaoPoder(e, n.id) === null);
+    if (d === 'vagas') {
+      for (let k = 0; k < 4; k++) {
+        const t = tocaveis()[0];
+        if (t) tocar(e, t.id);
+      }
+      return;
+    }
+    const feitos = d === 'ganhou' ? sol.length : Math.floor(sol.length * 0.4);
     for (let i = 0; i < feitos; i++) {
-      tocar(e, origemDe(sol[i]));
+      tocar(e, sol[i]);
       rodarAteParar(e);
     }
     if (d === 'meio') {
-      // mais duas formigas em movimento
-      for (let k = 0; k < 2 && feitos + k < sol.length; k++) {
-        tocar(e, origemDe(sol[feitos + k]));
-        for (let s = 0; s < 7; s++) passo(e);
+      for (let k = 0; k < 3; k++) {
+        const id = sol[feitos + k] ?? tocaveis()[0]?.id;
+        if (id !== undefined) tocar(e, id);
       }
+      for (let s = 0; s < 60; s++) passo(e);
     }
     if (d === 'perdeu') {
       e.resultado = 'derrota';
-      e.motivo = 'As formigas não têm onde esperar';
+      e.motivo = 'As vagas encheram';
     }
-    desenharFormigasTrilha(true);
-    assinatura = '';
-    renderTudo();
-    redesenhar();
-    if (e.resultado !== 'jogando') terminar();
   }
+  if (demo) aplicarDemo(demo);
+  ajustar();
+  if (demo && e.resultado !== 'jogando') agendarFim(true);
+  else if (temCano && !demo && !progresso().faixasVistas.includes(FAIXA_CANO)) {
+    faixa.innerHTML = `<div class="cartao"><div class="festa">🔧</div><h2>Novidade!</h2><p class="faixa">Ninhos ligados por cano sobem juntos e precisam de vagas livres para todos.</p><button class="btn grande ambar" id="cEntendi">Entendi</button></div>`;
+    faixa.hidden = false;
+    faixa.querySelector('#cEntendi')!.addEventListener('click', () => {
+      guardar({ faixasVistas: [...progresso().faixasVistas, FAIXA_CANO] });
+      faixa.hidden = true;
+      acordar();
+    });
+  }
+  acordar();
 
   return () => {
-    window.clearTimeout(timer);
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    window.clearTimeout(fimTimer);
+    window.clearTimeout(avisoTimer);
     window.removeEventListener('resize', aoRedimensionar);
   };
 }
-
-void REGRAS;
