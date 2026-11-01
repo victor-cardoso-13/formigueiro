@@ -164,6 +164,19 @@ describe('formigas', () => {
     expect(maior).toBeLessThanOrEqual(10);
     expect(pegou).toBeGreaterThan(10); // saíram mais formigas depois da primeira leva
   });
+  it('ninhos ligados por cano sempre ficam lado a lado nas vagas (as vagas se reorganizam)', () => {
+    const e = novoEstado(fase(['0000'], [[{ cor: 0, n: 1 }, { cor: 0, n: 1 }, { cor: 0, n: 1 }, { cor: 0, n: 1, g: 1 }, { cor: 0, n: 1, g: 1 }]]));
+    tocar(e, 1);
+    tocar(e, 2);
+    tocar(e, 3);
+    e.vagas[1] = null; // o do meio terminou: sobra um buraco entre os outros
+    e.vagas[3] = null;
+    expect(e.vagas.map((v) => v?.id ?? 0)).toEqual([1, 0, 3, 0, 0]);
+    tocar(e, 4);
+    const lugares = e.vagas.map((v, i) => (v && v.grupo === 1 ? i : -1)).filter((i) => i >= 0);
+    expect(lugares.length).toBe(2);
+    expect(lugares[1] - lugares[0]).toBe(1);
+  });
   it('cada quadradinho só é escolhido por uma formiga', () => {
     const e = novoEstado(fase(['00', '00'], [[{ cor: 0, n: 4 }]]));
     tocar(e, 1);

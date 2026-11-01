@@ -55,12 +55,38 @@ function estiloCor(cor: number): string {
   return `--c:${c};--d:${escura}`;
 }
 
-/** Tubo dos canos (SVG): contorno, corpo e um brilho fino em cima. Sempre reto (só trechos na horizontal e na vertical). */
-function tubo(caminhos: string, larg: number): string {
-  return `<g fill="none" stroke-linejoin="round" stroke-linecap="round">
-    <g stroke="#3f4370" stroke-width="${larg + 4}">${caminhos}</g>
-    <g stroke="#a9aed2" stroke-width="${larg}">${caminhos}</g>
-    <g stroke="#dfe2f4" stroke-width="${Math.max(1.5, larg * 0.28)}" transform="translate(0 ${-larg * 0.2})">${caminhos}</g></g>`;
+/** Um trecho de cano ligando dois ninhos: `d` é o caminho (sempre reto), `cor` a cor do ninho de onde ele sai. */
+interface Trecho {
+  d: string;
+  cor: string;
+  /** pontas (para as tampinhas redondas) */
+  de: { x: number; y: number };
+  ate: { x: number; y: number };
+}
+
+/** Mistura duas cores "#rrggbb" (t = quanto da segunda). */
+function misturaCor(a: string, b: string, t: number): string {
+  const n = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+  const [x, y] = [n(a), n(b)];
+  return `#${x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Canos no estilo do Colony Flow: haste fina e redonda na cor do ninho de onde sai, com brilho, contorno e tampinhas nas pontas. */
+function canosSvg(trechos: Trecho[], larg: number): string {
+  if (!trechos.length) return '';
+  const hastes = trechos
+    .map((t) => {
+      const escura = misturaCor(t.cor, '#1d1a33', 0.62);
+      const tampa = (q: { x: number; y: number }) =>
+        `<circle cx="${q.x}" cy="${q.y}" r="${larg * 0.9}" fill="${t.cor}" stroke="${escura}" stroke-width="3"/><circle cx="${q.x - larg * 0.22}" cy="${q.y - larg * 0.25}" r="${larg * 0.26}" fill="#fff" fill-opacity="0.5"/>`;
+      return `<g class="cano">
+        <path d="${t.d}" stroke="${escura}" stroke-width="${larg + 6}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        <path class="corpo" d="${t.d}" stroke="${t.cor}" stroke-width="${larg}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="${t.d}" stroke="#fff" stroke-opacity="0.5" stroke-width="${Math.max(2, larg * 0.26)}" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(0 ${-larg * 0.2})"/>
+        ${tampa(t.de)}${tampa(t.ate)}</g>`;
+    })
+    .join('');
+  return hastes;
 }
 
 export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: string): () => void {
@@ -219,6 +245,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
 
   // ---------- grade de ninhos ----------
   const SIMB = () => progresso().ajudas.simbolos;
+  /** Grupo de cano cujo parceiro escondido está sendo mostrado (depois de tocar num ninho bloqueado). */
+  let canoAtivo: number | null = null;
   function renderGrade() {
     const frenteOk = new Set(frente(e).filter((n) => podeNaFrente(n.id)).map((n) => n.id));
     const colunas: Ninho[][] = [];
@@ -239,33 +267,60 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           aria-label="Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas">${simb}<span class="n">${n.restam}</span></button>`;
       }),
     );
-    // canos entre os ninhos ligados: saem da parte de baixo (o "lado") de cada ninho e correm sempre retos;
-    // trechos em pé passam pelo corredor entre as colunas, para nunca cobrir o número de outro ninho.
-    const porGrupo = new Map<number, { x: number; y: number }[]>();
-    for (const p of pos.values()) if (p.vis && p.grupo !== undefined) porGrupo.set(p.grupo, [...(porGrupo.get(p.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh * 0.83 }]);
+    // Canos (como no Colony): passam por trás dos ninhos, no meio da altura, e só aparecem na fresta entre eles.
+    // Se o ninho ligado ainda está lá atrás (escondido), o cano desce até uma fichinha embaixo que mostra qual é.
+    const porGrupo = new Map<number, { x: number; y: number; vis: boolean; cor: number; n: number }[]>();
+    colunas.forEach((col) =>
+      col.forEach((n) => {
+        const p = pos.get(n.id)!;
+        if (n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh / 2, vis: p.vis, cor: n.cor, n: n.restam }]);
+      }),
+    );
     const larguraTotal = nCol * cw + (nCol - 1) * CG;
-    let canos = '';
-    let bocas = '';
+    const alturaGrade = R * nh + (R - 1) * RG;
     const larg = Math.max(6, Math.round(nh * 0.14));
-    for (const pts of porGrupo.values()) {
-      pts.sort((a, b) => a.x - b.x || a.y - b.y);
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1];
-        const b = pts[i];
-        if (Math.abs(a.y - b.y) < 1) canos += `<path d="M${a.x} ${a.y}H${b.x}"/>`;
-        else {
-          let gx = a.x + cw / 2 + CG / 2;
-          if (Math.abs(a.x - b.x) < 1 && gx > larguraTotal) gx = a.x - cw / 2 - CG / 2;
-          canos += `<path d="M${a.x} ${a.y}H${gx}V${b.y}H${b.x}"/>`;
+    const trechos: Trecho[] = [];
+    const fichas: { cor: number; n: number; de: { x: number; y: number; cor: number } }[] = [];
+    const cor = (k: number) => PALETA[k].cor;
+    for (const [g, membros] of porGrupo) {
+      const vis = membros.filter((q) => q.vis).sort((a, b) => a.x - b.x);
+      const escondidosDoGrupo = membros.filter((q) => !q.vis);
+      for (let i = 1; i < vis.length; i++) {
+        const a = vis[i - 1];
+        const b = vis[i];
+        // haste fina, do centro de um ninho ao do outro, por cima, na parte de baixo (o número fica livre)
+        const ya = a.y + nh * 0.36;
+        const yb = b.y + nh * 0.36;
+        let d = `M${a.x} ${ya}H${b.x}`;
+        if (Math.abs(a.y - b.y) >= 1) {
+          const gx = a.x + cw / 2 + CG / 2;
+          d = `M${a.x} ${ya}H${gx}V${yb}H${b.x}`;
         }
+        trechos.push({ d, cor: cor(a.cor), de: { x: a.x, y: ya }, ate: { x: b.x, y: yb } });
       }
-      for (const p of pts) bocas += `<circle cx="${p.x}" cy="${p.y}" r="${larg * 0.85}"/>`;
+      if (vis.length && escondidosDoGrupo.length && g === canoAtivo) {
+        const de = vis[vis.length - 1];
+        for (const h of escondidosDoGrupo) fichas.push({ cor: h.cor, n: h.n, de });
+      }
     }
-    const svg = canos
-      ? `<svg class="canos" width="${larguraTotal}" height="${R * nh + (R - 1) * RG}" aria-hidden="true">${tubo(canos, larg)}<g fill="#a9aed2" stroke="#3f4370" stroke-width="2">${bocas}</g></svg>`
-      : '';
-    grade.innerHTML = svg + html;
-    mais.textContent = escondidos > 0 ? `+${escondidos} atrás` : '';
+    const fichasHtml = fichas.map((f, i) => `<span class="ficha-cano" data-i="${i}" style="${estiloCor(f.cor)}">${f.n}</span>`).join('');
+    grade.innerHTML = html;
+    mais.innerHTML = `${fichasHtml}${escondidos > 0 ? `<span class="pilula">+${escondidos} atrás</span>` : ''}`;
+    // cano das fichas: desce pelo corredor ao lado e vai até a fichinha
+    const gr = grade.getBoundingClientRect();
+    fichas.forEach((f, i) => {
+      const el = mais.querySelector<HTMLElement>(`.ficha-cano[data-i="${i}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const fx = r.left + r.width / 2 - gr.left;
+      const fy = r.top + r.height / 2 - gr.top;
+      const dir = f.de.x + cw / 2 + CG / 2 <= larguraTotal;
+      const gx = dir ? f.de.x + cw / 2 + CG / 2 : f.de.x - cw / 2 - CG / 2;
+      const y0 = f.de.y + nh * 0.36;
+      trechos.push({ d: `M${f.de.x} ${y0}H${gx}V${fy}H${fx}`, cor: cor(f.de.cor), de: { x: f.de.x, y: y0 }, ate: { x: fx, y: fy } });
+    });
+    const svg = trechos.length ? `<svg class="canos" width="${larguraTotal}" height="${alturaGrade}" aria-hidden="true">${canosSvg(trechos, larg)}</svg>` : '';
+    grade.insertAdjacentHTML('afterbegin', svg);
   }
 
   // ---------- vagas (ninhos subidos) ----------
@@ -290,24 +345,24 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     }
     return el;
   }
-  /** Ninhos ligados que estão nas vagas continuam ligados pelo cano (como no Colony Flow). */
+  /** Ninhos ligados que estão nas vagas continuam ligados pelo cano: lado a lado, só na fresta entre as vagas. */
   function canosNasVagas() {
     const porGrupo = new Map<number, number[]>();
     e.vagas.forEach((n, i) => {
       if (n && n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), i]);
     });
     const vs = m.W * 0.172;
-    const larg = Math.max(6, Math.round(vs * 0.12));
-    let canos = '';
-    let bocas = '';
+    const larg = Math.max(6, Math.round(vs * 0.13));
+    const y = py(m, centroVaga(m.h, 0).y) + vs * 0.3;
+    const trechos: Trecho[] = [];
     for (const idx of porGrupo.values()) {
-      if (idx.length < 2) continue;
-      const y = py(m, centroVaga(m.h, 0).y) + vs * 0.3;
-      const xs = idx.map((i) => px(m, centroVaga(m.h, i).x));
-      canos += `<path d="M${xs[0]} ${y}H${xs[xs.length - 1]}"/>`;
-      for (const x of xs) bocas += `<circle cx="${x}" cy="${y}" r="${larg * 0.85}"/>`;
+      for (let k = 1; k < idx.length; k++) {
+        const a = px(m, centroVaga(m.h, idx[k - 1]).x);
+        const b = px(m, centroVaga(m.h, idx[k]).x);
+        trechos.push({ d: `M${a} ${y}H${b}`, cor: PALETA[e.vagas[idx[k - 1]]!.cor].cor, de: { x: a, y }, ate: { x: b, y } });
+      }
     }
-    canosVagas.innerHTML = canos ? `${tubo(canos, larg)}<g fill="#a9aed2" stroke="#3f4370" stroke-width="2">${bocas}</g>` : '';
+    canosVagas.innerHTML = canosSvg(trechos, larg);
   }
   function sincVagas(forcar = false) {
     canosNasVagas();
@@ -443,9 +498,24 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     const j = jogoEl.getBoundingClientRect();
     const z = zonaGrade.getBoundingClientRect();
     el.style.left = `${z.left - j.left + z.width / 2}px`;
-    el.style.top = `${z.top - j.top + z.height * 0.66}px`;
+    el.style.top = `${z.top - j.top - 34}px`; // por cima das vagas, para não tapar os canos
     jogoEl.appendChild(el);
     avisoTimer = window.setTimeout(() => el.remove(), 2200);
+  }
+  /** Faz o(s) cano(s) e as fichinhas pulsarem um pouco, para ver com quem o ninho está ligado. */
+  let canoTimer = 0;
+  function mostrarCano(grupo: number) {
+    canoAtivo = grupo;
+    renderGrade();
+    zonaGrade.classList.remove('mostra-cano');
+    void zonaGrade.offsetWidth;
+    zonaGrade.classList.add('mostra-cano');
+    window.clearTimeout(canoTimer);
+    canoTimer = window.setTimeout(() => {
+      zonaGrade.classList.remove('mostra-cano');
+      canoAtivo = null;
+      renderGrade();
+    }, 2600);
   }
   function tremer(ids: number[]) {
     for (const id of ids) {
@@ -468,7 +538,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     if (motivo === 'atras') {
       const un = unidade(e, id) ?? [];
       tremer(un.map((n) => n.id));
-      return aviso(un.length > 1 ? 'Este cano está ligado a um ninho que ainda está atrás' : 'Use os ninhos da frente');
+      if (un.length > 1 && un[0].grupo !== undefined) mostrarCano(un[0].grupo);
+      return aviso(un.length > 1 ? 'Os dois ninhos do cano precisam estar na frente' : 'Use os ninhos da frente');
     }
     if (motivo) return;
     const de = new Map<number, DOMRect>();
@@ -477,7 +548,21 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       if (b) de.set(n.id, b.getBoundingClientRect());
     }
     pilha.push(clonar(e));
+    const antes = new Map<number, { el: HTMLElement; r: DOMRect }>();
+    for (const el of arena.querySelectorAll<HTMLElement>('.ninho-vaga:not(.saindo)')) antes.set(Number(el.dataset.id), { el, r: el.getBoundingClientRect() });
     const evs = tocar(e, id)!;
+    // os ninhos das vagas se reorganizam para os ligados por cano ficarem lado a lado
+    for (const ev of evs) {
+      const a = antes.get(ev.tipo === 'moveu' ? ev.id : -1);
+      if (ev.tipo !== 'moveu' || !a) continue;
+      vagasEl[ev.vaga].appendChild(a.el);
+      const novo = a.el.getBoundingClientRect();
+      a.el.style.zIndex = '8';
+      a.el.animate([{ transform: `translate(${a.r.left - novo.left}px, ${a.r.top - novo.top}px)` }, { transform: 'translate(0, 0)' }], { duration: 300, easing: 'cubic-bezier(.2,.8,.3,1)' }).finished.then(
+        () => (a.el.style.zIndex = ''),
+        () => undefined,
+      );
+    }
     for (const ev of evs) if (ev.tipo === 'subiu') criarNinhoVaga(ev.vaga, e.vagas[ev.vaga]!, de.get(ev.id));
     renderGrade();
     atualizarBotoes();

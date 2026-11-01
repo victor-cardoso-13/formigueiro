@@ -102,17 +102,38 @@ export function motivoDeNaoPoder(e: Estado, id: number): 'fim' | 'atras' | 'vaga
 
 export const podeTocar = (e: Estado, id: number): boolean => motivoDeNaoPoder(e, id) === null;
 
-/** Sobe o ninho (e os ligados) para as vagas livres. Retorna os eventos, ou null se o toque não vale. */
+/** Primeira posição com `k` vagas livres seguidas, ou -1. */
+function corridaLivre(e: Estado, k: number): number {
+  for (let i = 0; i + k <= e.vagas.length; i++) if (e.vagas.slice(i, i + k).every((v) => !v)) return i;
+  return -1;
+}
+
+/** Junta os ninhos das vagas à esquerda (mesma ordem), para as vagas livres ficarem todas seguidas à direita. */
+function reorganizarVagas(e: Estado, eventos: Evento[]) {
+  const ocupados = e.vagas.filter((v): v is Ninho => !!v);
+  ocupados.forEach((n, i) => {
+    if (e.vagas[i] !== n) eventos.push({ tipo: 'moveu', id: n.id, vaga: i });
+  });
+  e.vagas = e.vagas.map((_, i) => ocupados[i] ?? null);
+}
+
+/**
+ * Sobe o ninho (e os ligados) para as vagas livres. Ninhos ligados por cano ficam SEMPRE lado a lado: se as vagas
+ * livres não estão seguidas, os ninhos das vagas se reorganizam (encostam à esquerda) antes de subir.
+ * Retorna os eventos, ou null se o toque não vale.
+ */
 export function tocar(e: Estado, id: number): Evento[] | null {
   if (!podeTocar(e, id)) return null;
   const un = unidade(e, id)!;
   const eventos: Evento[] = [];
+  if (un.length > 1 && corridaLivre(e, un.length) < 0) reorganizarVagas(e, eventos);
+  let vaga = un.length > 1 ? corridaLivre(e, un.length) : e.vagas.indexOf(null);
   for (const n of un) {
     const lugar = lugarDe(e, n.id)!;
     e.grade[lugar.linha][lugar.coluna] = null;
-    const vaga = e.vagas.indexOf(null);
     e.vagas[vaga] = n;
     eventos.push({ tipo: 'subiu', id: n.id, vaga });
+    vaga++;
   }
   verificarFim(e, eventos);
   return eventos;

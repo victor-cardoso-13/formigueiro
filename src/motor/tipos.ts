@@ -102,6 +102,7 @@ export interface Fase {
 /** O que aconteceu (para a tela animar). */
 export type Evento =
   | { tipo: 'subiu'; id: number; vaga: number }
+  | { tipo: 'moveu'; id: number; vaga: number }
   | { tipo: 'saiu'; formiga: number; ninho: number }
   | { tipo: 'pegou'; formiga: number; x: number; y: number }
   | { tipo: 'entregou'; formiga: number }
