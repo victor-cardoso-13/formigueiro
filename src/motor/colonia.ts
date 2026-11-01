@@ -113,6 +113,7 @@ export function tocar(e: Estado, id: number): Evento[] | null {
     e.vagas[vaga] = n;
     eventos.push({ tipo: 'subiu', id: n.id, vaga });
   }
+  verificarFim(e, eventos);
   return eventos;
 }
 
@@ -190,6 +191,19 @@ function algumToqueValido(e: Estado): boolean {
   return frente(e).some((n) => podeTocar(e, n.id));
 }
 
+/** Vitória ou derrota (também depois de um toque: ninho que não alcança nada na última vaga). */
+function verificarFim(e: Estado, eventos: Evento[]) {
+  if (e.resultado !== 'jogando') return;
+  if (e.pedacos === 0 && e.formigas.length === 0) {
+    e.resultado = 'vitoria';
+    eventos.push({ tipo: 'vitoria' });
+  } else if (e.formigas.length === 0 && !algumNinhoPodeSair(e) && !algumToqueValido(e)) {
+    e.resultado = 'derrota';
+    e.motivo = 'As vagas estão cheias e nenhum ninho consegue pegar quadradinhos';
+    eventos.push({ tipo: 'derrota', motivo: e.motivo });
+  }
+}
+
 /** Avança 1 passo. */
 export function passo(e: Estado): Evento[] {
   const eventos: Evento[] = [];
@@ -235,15 +249,7 @@ export function passo(e: Estado): Evento[] {
       eventos.push({ tipo: 'ninhoVazio', id: n.id, vaga: i });
     }
   });
-  // 4) fim de jogo
-  if (e.pedacos === 0 && e.formigas.length === 0) {
-    e.resultado = 'vitoria';
-    eventos.push({ tipo: 'vitoria' });
-  } else if (e.formigas.length === 0 && !algumNinhoPodeSair(e) && !algumToqueValido(e)) {
-    e.resultado = 'derrota';
-    e.motivo = 'As vagas estão cheias e nenhum ninho consegue pegar quadradinhos';
-    eventos.push({ tipo: 'derrota', motivo: e.motivo });
-  }
+  verificarFim(e, eventos);
   return eventos;
 }
 
