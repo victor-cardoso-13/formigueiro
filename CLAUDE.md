@@ -3,7 +3,8 @@
 Quebra-cabeça de formigas e açúcar, feito para o Victor e a família (idosos primeiro). Slug `formigueiro`.
 **Esta pasta é só do Formigueiro.** Não mexa em outros jogos, no `_modelo/` nem no `APRENDIZADOS.md` daqui
 (anote sugestões no `PROMPT-PROXIMA-SESSAO.md`).
-**Ainda NÃO foi publicado**: repositório só local (sem GitHub, sem Pages). Sem Firebase: progresso só no `localStorage` (`formigueiro:v4`).
+**Publicado** em https://victor-cardoso-13.github.io/formigueiro/ (repositório `victor-cardoso-13/formigueiro`, PR + merge no `main` publica sozinho).
+Progresso no `localStorage` (`formigueiro:v4`, uma gaveta por conta) e, com login, na nuvem: Firebase compartilhado `jogos-sem-anuncio`, `jogadores/{uid}/jogos/formigueiro` (só fases ganhas e símbolos; ver `src/nuvem/`). Sem mexer nas regras do Firestore.
 
 ## Como falar com o usuário
 Português, linguagem simples, passo a passo (ele não programa). No fim, diga como testar no iPhone e no iPad.

@@ -3,7 +3,11 @@
  * Se um dia as fases forem recriadas, troque o "v4" da chave.
  * (v1 era a versão antiga com trilha e fome; o jogo foi refeito e o progresso antigo não vale mais.)
  */
-const CHAVE = 'formigueiro:v4';
+const BASE = 'formigueiro:v4';
+/** Última conta que entrou neste aparelho (só um "marcador", não é senha). */
+const ULTIMA_CONTA = 'formigueiro:ultima-conta';
+/** Cada conta tem a sua "gaveta" no aparelho, e quem joga sem conta tem outra: duas pessoas no mesmo celular não misturam o progresso. */
+const chave = (uid: string | null) => (uid ? `${BASE}:conta:${uid}` : BASE);
 
 export type Velocidade = 1 | 2 | 3;
 export type TelaSalva = 'inicio' | 'mapa' | 'jogo';
@@ -16,6 +20,8 @@ export interface Ajudas {
 
 export interface Progresso {
   ajudas: Ajudas;
+  /** quando os símbolos foram ligados/desligados por último (para juntar com a nuvem) */
+  simbolosEm: number;
   ganhas: number[];
   faseAtual: number;
   velocidade: Velocidade;
@@ -24,18 +30,39 @@ export interface Progresso {
   tela: TelaSalva;
 }
 
-const PADRAO: Progresso = { ajudas: { simbolos: false }, ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
+const PADRAO: Progresso = { ajudas: { simbolos: false }, simbolosEm: 0, ganhas: [], faseAtual: 1, velocidade: 1, tutorialVisto: false, faixasVistas: [], tela: 'inicio' };
 
 let cache: Progresso | null = null;
+/** De quem é a gaveta aberta agora (null = jogando sem conta). */
+let dono: string | null = localStorage.getItem(ULTIMA_CONTA);
+let aoSalvar: ((p: Progresso) => void) | null = null;
 
-export function progresso(): Progresso {
-  if (cache) return cache;
+export const contaAtiva = () => dono;
+
+/** Troca de gaveta (entrou, saiu ou trocou de conta). */
+export function usarConta(uid: string | null) {
+  dono = uid;
+  cache = null;
   try {
-    const bruto = localStorage.getItem(CHAVE);
+    if (uid) localStorage.setItem(ULTIMA_CONTA, uid);
+    else localStorage.removeItem(ULTIMA_CONTA);
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Avisa a nuvem a cada salvamento (quem chama decide quando enviar). */
+export function quandoSalvar(fn: ((p: Progresso) => void) | null) {
+  aoSalvar = fn;
+}
+
+/** Lê a gaveta de `uid` (null = sem conta). Só pega os campos que existem hoje. */
+export function carregar(uid: string | null = dono): Progresso {
+  try {
+    const bruto = localStorage.getItem(chave(uid));
     const lido = bruto ? JSON.parse(bruto) : {};
-    // só pegamos os campos que existem hoje; qualquer campo antigo (ex.: "olho") é ignorado
     const v = [1, 2, 3].includes(lido.velocidade) ? (lido.velocidade as Velocidade) : PADRAO.velocidade;
-    cache = {
+    return {
       ganhas: Array.isArray(lido.ganhas) ? lido.ganhas.filter((n: unknown) => typeof n === 'number') : [],
       faseAtual: typeof lido.faseAtual === 'number' ? lido.faseAtual : PADRAO.faseAtual,
       velocidade: v,
@@ -43,21 +70,51 @@ export function progresso(): Progresso {
       faixasVistas: Array.isArray(lido.faixasVistas) ? lido.faixasVistas : [],
       tela: ['inicio', 'mapa', 'jogo'].includes(lido.tela) ? lido.tela : PADRAO.tela,
       ajudas: { simbolos: !!lido.ajudas?.simbolos },
+      simbolosEm: typeof lido.simbolosEm === 'number' ? lido.simbolosEm : 0,
     };
   } catch {
-    cache = { ...PADRAO, ajudas: { ...PADRAO.ajudas } };
+    return { ...PADRAO, ajudas: { ...PADRAO.ajudas } };
   }
-  return cache!;
 }
 
-export function guardar(parcial: Partial<Progresso>) {
-  cache = { ...progresso(), ...parcial };
+export function progresso(): Progresso {
+  return (cache ??= carregar(dono));
+}
+
+function gravar(p: Progresso, uid: string | null) {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify(cache));
+    localStorage.setItem(chave(uid), JSON.stringify(p));
   } catch {
     /* aparelho cheio ou modo privado: o jogo segue sem salvar */
   }
 }
+
+export function guardar(parcial: Partial<Progresso>) {
+  const antes = progresso();
+  const novo = { ...antes, ...parcial };
+  if (parcial.ajudas && parcial.ajudas.simbolos !== antes.ajudas.simbolos) novo.simbolosEm = Date.now();
+  cache = novo;
+  gravar(novo, dono);
+  aoSalvar?.(novo);
+}
+
+/** Troca o progresso da gaveta aberta por outro (juntado com a nuvem) sem avisar a nuvem de novo. */
+export function definirProgresso(p: Progresso, uid: string | null = dono) {
+  gravar(p, uid);
+  if (uid === dono) cache = p;
+}
+
+/** Apaga a gaveta de quem joga sem conta (depois de levar o progresso para uma conta). */
+export function limparSemConta() {
+  try {
+    localStorage.removeItem(chave(null));
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Há algum progresso (fases ganhas)? */
+export const temProgresso = (p: Progresso) => p.ganhas.length > 0;
 
 export function ganhou(id: number) {
   const p = progresso();
@@ -78,7 +135,7 @@ export function liberada(f: { id: number; grupo: string }, todas: { id: number; 
 export function esquecerTudoParaTeste() {
   cache = null;
   try {
-    localStorage.removeItem(CHAVE);
+    localStorage.removeItem(chave(dono));
   } catch {
     /* ignora */
   }
