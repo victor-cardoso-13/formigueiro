@@ -13,7 +13,6 @@ import {
   apagarCelula,
   desenharCamada,
   desenharQuadro,
-  ehClara,
   limparCamada,
   medir,
   prepararCanvas,
@@ -41,6 +40,8 @@ const NOME_VEL: Record<Vel, string> = { 1: 'Lento', 2: 'Normal', 3: 'Turbo' };
 const FAIXA_CANO = 9001;
 
 const ICONE_DESFAZER = `<svg class="ic" viewBox="0 0 24 24" width="24" height="24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+const ICONE_VEL = `<svg class="ic-vel" viewBox="0 0 30 20" width="30" height="20" aria-hidden="true"><path d="M2 3l12 7-12 7zM15 3l12 7-12 7z"/></svg>`;
+const ICONE_FASES = `<svg class="ic" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`;
 const ICONE_RECOMECAR = `<svg class="ic" viewBox="0 0 24 24" width="24" height="24"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>`;
 
 function lerVelocidade(): Vel {
@@ -48,15 +49,27 @@ function lerVelocidade(): Vel {
   return v === 2 ? 2 : v >= 3 ? 3 : 1;
 }
 
-/** Variáveis CSS de cor de um ninho (número escuro em cor clara, branco em cor escura). */
+/** Variáveis CSS de cor de um ninho. Como no Colony Flow: número sempre branco com contorno escuro, em qualquer cor. */
 function estiloCor(cor: number): string {
   const { cor: c, escura } = PALETA[cor];
-  const clara = ehClara(c);
-  return `--c:${c};--d:${escura};--tc:${clara ? '#3b2f2a' : '#fff'};--ts:${clara ? '#fff' : '#3b2f2a'}`;
+  return `--c:${c};--d:${escura}`;
+}
+
+/** Tubo dos canos (SVG): contorno, corpo e um brilho fino em cima. Sempre reto (só trechos na horizontal e na vertical). */
+function tubo(caminhos: string, larg: number): string {
+  return `<g fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <g stroke="#3f4370" stroke-width="${larg + 4}">${caminhos}</g>
+    <g stroke="#a9aed2" stroke-width="${larg}">${caminhos}</g>
+    <g stroke="#dfe2f4" stroke-width="${Math.max(1.5, larg * 0.28)}" transform="translate(0 ${-larg * 0.2})">${caminhos}</g></g>`;
 }
 
 export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: string): () => void {
   let e: Estado = novoEstado(fase);
+  // fundo azul-arroxeado (estilo Colony Flow) só na tela do jogo; as outras telas continuam creme
+  document.documentElement.classList.add('modo-jogo');
+  const metaCor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  const corAntes = metaCor?.content;
+  if (metaCor) metaCor.content = '#5d6290';
   const pilha: Estado[] = [];
   let vel: Vel = lerVelocidade();
   const R = Math.min(3, fase.grade.length); // linhas de ninhos que aparecem
@@ -81,16 +94,17 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   app.innerHTML = `
   <div class="jogo" id="jogo">
     <div class="topo">
-      <button class="btn" id="bFases" aria-label="Voltar para as fases">☰ Fases</button>
-      <h2>Fase ${fase.id} · ${fase.nome}</h2>
-      <button class="btn redondo" id="bAjuda" aria-label="Como jogar">?</button>
+      <button class="btn roxo" id="bFases" aria-label="Voltar para as fases">${ICONE_FASES} Fases</button>
+      <h2 title="${fase.nome}">Fase ${fase.id}</h2>
+      <button class="btn vel" id="bVel" aria-label="Velocidade das formigas: toque para mudar"></button>
     </div>
     <div class="palco">
       <div class="arena" id="arena">
-        <div class="chao" id="chao"></div>
         <canvas id="cvQuadro"></canvas>
-        <div class="buraco" id="buraco"><i></i></div>
+        <div class="tampa" id="tampa"></div>
+        <div class="buraco" id="buraco"></div>
         ${Array.from({ length: REGRAS.VAGAS }, () => `<div class="vaga"></div>`).join('')}
+        <svg class="canos-vagas" id="canosVagas" aria-hidden="true"></svg>
         <canvas id="cvFormigas"></canvas>
       </div>
     </div>
@@ -99,9 +113,9 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
       <div class="mais" id="mais"></div>
     </div>
     <div class="botoes">
-      <button class="btn" id="bDesfazer">${ICONE_DESFAZER} Desfazer</button>
-      <button class="btn" id="bRecomecar">${ICONE_RECOMECAR} Recomeçar</button>
-      <button class="btn vel" id="bVel" aria-label="Velocidade das formigas: toque para mudar"></button>
+      <button class="btn bege" id="bDesfazer">${ICONE_DESFAZER} Desfazer</button>
+      <button class="btn bege" id="bRecomecar">${ICONE_RECOMECAR} Recomeçar</button>
+      <button class="btn bege redondo" id="bAjuda" aria-label="Como jogar">?</button>
     </div>
     <div class="cortina" id="cortina" hidden></div>
     <div class="cortina" id="faixa" hidden></div>
@@ -109,10 +123,11 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!;
   const jogoEl = $('jogo');
   const arena = $('arena');
-  const chao = $('chao');
+  const canosVagas = $<SVGSVGElement & HTMLElement>('canosVagas');
   const cvQuadro = $<HTMLCanvasElement>('cvQuadro');
   const cvFormigas = $<HTMLCanvasElement>('cvFormigas');
   const buracoEl = $('buraco');
+  const tampaEl = $('tampa');
   const vagasEl = [...arena.querySelectorAll<HTMLElement>('.vaga')];
   const zonaGrade = $('zonaGrade');
   const grade = $('grade');
@@ -133,6 +148,7 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     RG = grande ? 10 : 8;
     CG = grande ? 24 : 16;
     const pill = 26;
+    const BARRA = 24; // a barra roxa em volta dos botões de baixo
     const cand = grande ? [96, 88, 80, 72, 64, 58] : [66, 62, 58, 54, 50, 48];
     const alturaGrade = (n: number) => R * n + (R - 1) * RG + pill;
     const raz = razaoArena(m.h);
@@ -141,13 +157,13 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     if (paisagem) {
       W = Math.min(Hj / raz, (Wj * 0.52) / razaoLargura);
       const dir = Wj - W * razaoLargura - 16;
-      const disp = Hj - 2 * bh - 2 * gap;
+      const disp = Hj - 2 * bh - 2 * gap - BARRA;
       nh = cand.find((n) => alturaGrade(n) <= disp) ?? cand[cand.length - 1];
       larguraGrade = dir;
       jogoEl.style.gridTemplateColumns = `${Math.floor(W * razaoLargura)}px minmax(0, 1fr)`;
     } else {
       const Wmax = Wj / razaoLargura;
-      const disp = Hj - 2 * bh - 3 * gap;
+      const disp = Hj - 2 * bh - 3 * gap - BARRA;
       nh = cand[cand.length - 1];
       W = Math.min(Wmax, (disp - alturaGrade(nh)) / raz);
       for (const n of cand) {
@@ -163,8 +179,10 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     }
     W = Math.max(120, Math.floor(W));
     const maxCw = grande ? 180 : 132;
-    const gw = Math.min(larguraGrade, nCol * maxCw + (nCol - 1) * CG);
-    cw = Math.floor((gw - (nCol - 1) * CG) / nCol);
+    // ninhos quase quadrados (como os blocos do Colony Flow), nunca "barras" compridas
+    cw = Math.floor((Math.min(larguraGrade, nCol * maxCw + (nCol - 1) * CG) - (nCol - 1) * CG) / nCol);
+    cw = Math.min(cw, Math.round(nh * 1.3));
+    const gw = nCol * cw + (nCol - 1) * CG;
     jogoEl.classList.toggle('paisagem', paisagem);
     jogoEl.classList.toggle('grande', grande);
     jogoEl.style.setProperty('--bh', `${bh}px`);
@@ -173,12 +191,15 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     // arena
     arena.style.width = `${m.Wt}px`;
     arena.style.height = `${m.Ht}px`;
-    const vs = m.W * 0.19;
+    const vs = m.W * 0.172;
     jogoEl.style.setProperty('--vs', `${vs}px`);
-    chao.style.cssText = `left:${px(m, -0.04)}px;top:${py(m, m.h + 0.075)}px;width:${m.W * 1.08}px;height:${m.Ht - py(m, m.h + 0.075) - m.base * 0.5}px`;
+    canosVagas.setAttribute('width', String(m.Wt));
+    canosVagas.setAttribute('height', String(m.Ht));
     const bu = buraco(m.h);
-    const bw = m.W * 0.24;
+    const bw = m.W * 0.22;
     buracoEl.style.cssText = `left:${px(m, bu.x) - bw / 2}px;top:${py(m, bu.y) - bw * 0.27}px;width:${bw}px;height:${bw * 0.54}px`;
+    // tampa de bueiro (só enfeite), encostada à direita do buraco
+    tampaEl.style.cssText = `left:${px(m, bu.x) + bw * 0.22}px;top:${py(m, bu.y) - bw * 0.22}px;width:${bw * 0.78}px;height:${bw * 0.46}px`;
     vagasEl.forEach((v, i) => {
       const c = centroVaga(m.h, i);
       v.style.cssText = `left:${px(m, c.x) - vs / 2}px;top:${py(m, c.y) - vs / 2}px;width:${vs}px;height:${vs}px`;
@@ -218,27 +239,30 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
           aria-label="Ninho ${PALETA[n.cor].nome}, ${n.restam} formigas">${simb}<span class="n">${n.restam}</span></button>`;
       }),
     );
-    // canos entre os ninhos ligados
+    // canos entre os ninhos ligados: saem da parte de baixo (o "lado") de cada ninho e correm sempre retos;
+    // trechos em pé passam pelo corredor entre as colunas, para nunca cobrir o número de outro ninho.
     const porGrupo = new Map<number, { x: number; y: number }[]>();
-    for (const p of pos.values()) if (p.vis && p.grupo !== undefined) porGrupo.set(p.grupo, [...(porGrupo.get(p.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh / 2 }]);
+    for (const p of pos.values()) if (p.vis && p.grupo !== undefined) porGrupo.set(p.grupo, [...(porGrupo.get(p.grupo) ?? []), { x: p.x + cw / 2, y: p.y + nh * 0.83 }]);
+    const larguraTotal = nCol * cw + (nCol - 1) * CG;
     let canos = '';
-    let aneis = '';
-    const larg = Math.round(nh * 0.28);
+    let bocas = '';
+    const larg = Math.max(6, Math.round(nh * 0.14));
     for (const pts of porGrupo.values()) {
-      pts.sort((a, b) => a.x - b.x);
+      pts.sort((a, b) => a.x - b.x || a.y - b.y);
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1];
         const b = pts[i];
-        const mx = (a.x + b.x) / 2;
-        const ea = a.x + cw / 2 - cw * 0.2; // o cano entra um pouco em cada ninho
-        const eb = b.x - cw / 2 + cw * 0.2;
-        canos += `<path d="M${ea} ${a.y}H${mx}V${b.y}H${eb}"/>`;
-        for (const [ax, ay] of [[a.x + cw / 2, a.y], [b.x - cw / 2, b.y]]) aneis += `<rect x="${ax - 5}" y="${ay - larg / 2 - 5}" width="10" height="${larg + 10}" rx="4"/>`;
+        if (Math.abs(a.y - b.y) < 1) canos += `<path d="M${a.x} ${a.y}H${b.x}"/>`;
+        else {
+          let gx = a.x + cw / 2 + CG / 2;
+          if (Math.abs(a.x - b.x) < 1 && gx > larguraTotal) gx = a.x - cw / 2 - CG / 2;
+          canos += `<path d="M${a.x} ${a.y}H${gx}V${b.y}H${b.x}"/>`;
+        }
       }
+      for (const p of pts) bocas += `<circle cx="${p.x}" cy="${p.y}" r="${larg * 0.85}"/>`;
     }
     const svg = canos
-      ? `<svg class="canos" width="${nCol * cw + (nCol - 1) * CG}" height="${R * nh + (R - 1) * RG}" aria-hidden="true"><g fill="none" stroke-linejoin="round" stroke-linecap="butt">
-        <g stroke="#b9a58f" stroke-width="${larg + 6}">${canos}</g><g stroke="#dccdb9" stroke-width="${larg}">${canos}</g><g stroke="#f1e8da" stroke-width="${Math.max(2, larg * 0.28)}" transform="translate(0 ${-larg * 0.22})">${canos}</g></g><g fill="#cdbba4" stroke="#b9a58f" stroke-width="3">${aneis}</g></svg>`
+      ? `<svg class="canos" width="${larguraTotal}" height="${R * nh + (R - 1) * RG}" aria-hidden="true">${tubo(canos, larg)}<g fill="#a9aed2" stroke="#3f4370" stroke-width="2">${bocas}</g></svg>`
       : '';
     grade.innerHTML = svg + html;
     mais.textContent = escondidos > 0 ? `+${escondidos} atrás` : '';
@@ -266,7 +290,27 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     }
     return el;
   }
+  /** Ninhos ligados que estão nas vagas continuam ligados pelo cano (como no Colony Flow). */
+  function canosNasVagas() {
+    const porGrupo = new Map<number, number[]>();
+    e.vagas.forEach((n, i) => {
+      if (n && n.grupo !== undefined) porGrupo.set(n.grupo, [...(porGrupo.get(n.grupo) ?? []), i]);
+    });
+    const vs = m.W * 0.172;
+    const larg = Math.max(6, Math.round(vs * 0.12));
+    let canos = '';
+    let bocas = '';
+    for (const idx of porGrupo.values()) {
+      if (idx.length < 2) continue;
+      const y = py(m, centroVaga(m.h, 0).y) + vs * 0.3;
+      const xs = idx.map((i) => px(m, centroVaga(m.h, i).x));
+      canos += `<path d="M${xs[0]} ${y}H${xs[xs.length - 1]}"/>`;
+      for (const x of xs) bocas += `<circle cx="${x}" cy="${y}" r="${larg * 0.85}"/>`;
+    }
+    canosVagas.innerHTML = canos ? `${tubo(canos, larg)}<g fill="#a9aed2" stroke="#3f4370" stroke-width="2">${bocas}</g>` : '';
+  }
   function sincVagas(forcar = false) {
+    canosNasVagas();
     vagasEl.forEach((v, i) => {
       if (forcar) v.replaceChildren();
       const n = e.vagas[i];
@@ -381,7 +425,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
     const pode = pilha.length > 0;
     bDesfazer.classList.toggle('apagado', !pode);
     bDesfazer.setAttribute('aria-disabled', String(!pode));
-    bVel.innerHTML = `<span class="vn">${vel}×</span><span class="vt">${NOME_VEL[vel]}</span>`;
+    bVel.innerHTML = `${ICONE_VEL}<span class="vtx"><span class="vn">${vel}×</span><span class="vt">${NOME_VEL[vel]}</span></span>`;
+    bVel.dataset.vel = String(vel);
   }
   function aviso(texto: string) {
     jogoEl.querySelector('.aviso')?.remove();
@@ -565,6 +610,8 @@ export function montarJogo(app: HTMLElement, fase: Fase, nav: Navegacao, demo?: 
   acordar();
 
   return () => {
+    document.documentElement.classList.remove('modo-jogo');
+    if (metaCor && corAntes) metaCor.content = corAntes;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
     window.clearTimeout(fimTimer);
