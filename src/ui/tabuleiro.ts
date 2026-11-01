@@ -65,7 +65,6 @@ const ESCURA = PALETA.map((c) => misturar(c.cor, 0, 0.3));
 /** "Lado" do bloquinho 3D (embaixo) — mais escuro que a face de cima. */
 const LADO = PALETA.map((c) => misturar(c.cor, 0, c.cor.toLowerCase() === '#fffdf6' ? 0.2 : 0.28));
 /** Fresta entre um bloquinho e o vizinho (bem fina, quase da cor do bloco). */
-const FRESTA = PALETA.map((c) => misturar(c.cor, 0, c.cor.toLowerCase() === '#fffdf6' ? 0.14 : 0.38));
 
 /** A cor é clara (amarelo, branco, rosa…)? Então o número em cima dela é escuro. */
 export function ehClara(hex: string): boolean {
@@ -99,9 +98,6 @@ function pintarCelula(ctx: CanvasRenderingContext2D, m: Medidas, dpr: number, x:
     return;
   }
   const c = m.cel;
-  // fresta fininha em volta (só um fio: nada de grade grossa)
-  ctx.fillStyle = FRESTA[cor];
-  ctx.fillRect(r.x, r.y, r.w, r.h);
   const g = Math.max(0.5, c * 0.05);
   const raio = c * 0.2;
   // corpo do bloco = lado (escuro), por baixo
