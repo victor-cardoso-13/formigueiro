@@ -85,6 +85,7 @@ describe('as 60 fases congeladas', () => {
         expect(new Set(cores).size).toBe(cores.length);
       }
       if (f.id <= 10) expect(grupos.size, 'fácil: sem canos').toBe(0);
+      if (f.id <= 30) for (const lugares of grupos.values()) expect(lugares.length, 'trios só a partir da fase 31').toBe(2);
     });
 
     it('replay da solução vence', () => {

@@ -15,7 +15,7 @@
 - facil: média 1.00 (faixa-alvo 0.7–1)
 - media: média 0.52 (faixa-alvo 0.3–0.7)
 - dificil: média 0.21 (faixa-alvo 0.1–0.35)
-- muito-dificil: média 0.05 (faixa-alvo 0–0.15)
+- muito-dificil: média 0.03 (faixa-alvo 0–0.15)
 
 Todas as fases estão dentro da faixa-alvo do grupo.
 
@@ -75,7 +75,7 @@ Todas as fases estão dentro da faixa-alvo do grupo.
 | 51 | muito-dificil | Barco de retalhos | 48×40 | 9 | 4 | 123 | 44 | 0.14 | ok |
 | 52 | muito-dificil | Mandala III | 48×36 | 9 | 4 | 84 | 32 | 0 | ok |
 | 53 | muito-dificil | Redemoinho III | 48×40 | 9 | 4 | 93 | 34 | 0.035 | ok |
-| 54 | muito-dificil | Mandala V | 44×40 | 8 | 4 | 117 | 46 | 0.15 | ok |
+| 54 | muito-dificil | Mandala V | 44×40 | 8 | 4 | 135 | 54 | 0 | ok |
 | 55 | muito-dificil | Mosaico III | 48×40 | 9 | 4 | 96 | 27 | 0.07 | ok |
 | 56 | muito-dificil | Tijolinhos III | 48×36 | 9 | 4 | 77 | 20 | 0.03 | ok |
 | 57 | muito-dificil | Círculos III | 40×40 | 9 | 4 | 80 | 24 | 0 | ok |

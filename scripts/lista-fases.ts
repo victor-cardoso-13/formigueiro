@@ -112,7 +112,7 @@ export function parametrosDe(id: number): Parametros {
 }
 
 /** Fases em que a 1ª semente não chegou na faixa: tenta outra. */
-const OUTRA_SEMENTE: Record<number, number> = { 11: 5000, 13: 5000, 26: 5000, 29: 5000, 50: 5000, 53: 5000, 54: 5000 };
+const OUTRA_SEMENTE: Record<number, number> = { 11: 5000, 13: 5000, 14: 2000, 16: 1000, 26: 5000, 29: 5000, 46: 1000, 50: 5000, 53: 5000 };
 
 export function entradas(): Entrada[] {
   return imagens().map(([id, nome, linhas]) => ({

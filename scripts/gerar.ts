@@ -51,6 +51,8 @@ function tabela() {
 60 fases **congeladas** em \`src/fases/fases.json\` (gerar de novo: \`node scripts/gerar.ts [primeira] [ultima]\`, depois \`node scripts/gerar.ts tabela\` para refazer este arquivo).
 **Toda fase tem solução provada** (o gerador e o teste refazem a solução no motor: tocar um ninho, esperar parar, tocar o próximo…).
 
+Tempo para refazer tudo: ~18 min de CPU em sequência; em 7 processos em paralelo (ex.: `1 10`, `11 20`, `21 30`, `31 38`, `39 46`, `47 53`, `54 60`) ~4 min. O resultado é reproduzível (sementes fixas em `scripts/lista-fases.ts`).
+
 ## Como são feitas
 1. **Imagem**: quadro cheio de quadradinhos (desenho à mão ampliado, de retalhos, ou padrão de código) com cor de fundo.
 2. **Planejamento com o motor de verdade**: repete-se "uma unidade" (1 ninho, ou 2–3 ninhos de cores diferentes ligados por cano, sempre de cores com quadradinho EXPOSTO no momento) e roda-se num clone até as formigas pararem; o tamanho \`n\` de cada ninho é reduzido ao que ele realmente entregou. Assim a soma dos \`n\` de cada cor = quadradinhos da cor.
