@@ -63,7 +63,7 @@ describe('as 60 fases congeladas', () => {
       expect([...ninhos.entries()].sort()).toEqual([...quadradinhos.entries()].sort());
     });
 
-    it('grade: colunas certas, canos só entre vizinhos da mesma linha (grupos de 2 ou 3)', () => {
+    it('grade: colunas certas, canos: vizinhos da mesma linha ou empilhados na mesma coluna (grupos de 2 ou 3)', () => {
       const colunas = f.id <= 20 ? 3 : 4;
       for (const linha of f.grade) expect(linha.length).toBe(colunas);
       expect(f.grade.flat().some(Boolean)).toBe(true);
@@ -77,9 +77,15 @@ describe('as 60 fases congeladas', () => {
       );
       for (const [g, lugares] of grupos) {
         expect([2, 3], `g=${g}`).toContain(lugares.length);
-        expect(new Set(lugares.map((x) => x.l)).size, `g=${g} na mesma linha`).toBe(1);
-        const cs = lugares.map((x) => x.c).sort((a, b) => a - b);
-        expect(cs[cs.length - 1] - cs[0], `g=${g} vizinhos`).toBe(cs.length - 1);
+        if (new Set(lugares.map((x) => x.c)).size === 1) {
+          // empilhados: mesma coluna, linhas seguidas
+          const ls = lugares.map((x) => x.l).sort((a, b) => a - b);
+          expect(ls[ls.length - 1] - ls[0], `g=${g} empilhados`).toBe(ls.length - 1);
+        } else {
+          expect(new Set(lugares.map((x) => x.l)).size, `g=${g} na mesma linha`).toBe(1);
+          const cs = lugares.map((x) => x.c).sort((a, b) => a - b);
+          expect(cs[cs.length - 1] - cs[0], `g=${g} vizinhos`).toBe(cs.length - 1);
+        }
         // cores diferentes dentro do mesmo cano
         const cores = lugares.map((x) => f.grade[x.l][x.c]!.cor);
         expect(new Set(cores).size).toBe(cores.length);

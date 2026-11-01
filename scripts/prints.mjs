@@ -40,7 +40,6 @@ const cenas = {
   'tutorial-4': '?limpo=1&tela=tutorial&passo=3',
   'tutorial-5': '?limpo=1&tela=tutorial&passo=4',
   'tutorial-6': '?limpo=1&tela=tutorial&passo=5',
-  'tutorial-5': '?limpo=1&tela=tutorial&passo=4',
 };
 
 /** Roda dentro da página: acha o que rola de verdade ou sai da tela. */
