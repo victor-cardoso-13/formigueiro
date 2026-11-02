@@ -3,6 +3,7 @@
  * O Firebase só é carregado quando alguém abre a janela de entrar (ou se já havia conta neste aparelho).
  */
 import { carregarConta, enviarAgora, eventosDaNuvem, ligar, sairDaConta, situacaoAtual, usuarioAtual } from '../nuvem/sincronia.ts';
+import { escapar } from './seguranca.ts';
 
 /** Texto curto do botão da tela inicial. */
 export function rotuloDoChip(): string {
@@ -122,7 +123,7 @@ const SITUACAO: Record<string, string> = {
 export function abrirConta() {
   const u = usuarioAtual();
   if (!u) return abrirEntrar();
-  janela('Sua conta', `<p class="email-conta">${u.email}</p><p>${SITUACAO[situacaoAtual()]}</p>`, [
+  janela('Sua conta', `<p class="email-conta">${escapar(u.email)}</p><p>${SITUACAO[situacaoAtual()]}</p>`, [
     { rotulo: 'Sair da conta', acao: () => confirmarSair() },
     { rotulo: 'Fechar', classe: 'verde' },
   ]);
